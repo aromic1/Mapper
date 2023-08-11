@@ -8,7 +8,7 @@ using Models;
 
 namespace Configuration
 {
-    public class Configuration
+    public class Configuration : IConfiguration
     {
         #region Constructors
 
@@ -27,7 +27,7 @@ namespace Configuration
 
         #region Methods
 
-        public void CreateMap<TSource, TDestination>(Action<TSource, TDestination> beforeMap = null, Action<TSource, TDestination> afterMap = null, IEnumerable<string> ignoreProperties = null, Dictionary<string, string> mapFroms = null,Dictionary<string, Action<TSource,TDestination>> propertyMaps= null)
+        public void CreateMap<TSource, TDestination>(Action<TSource, TDestination> beforeMap = null, Action<TSource, TDestination> afterMap = null, IEnumerable<string> ignoreProperties = null, Dictionary<string, string> mapFroms = null, Dictionary<string, Action<TSource, TDestination>> propertyMaps = null)
         {
             Type sourceType = typeof(TSource);
             Type destinationType = typeof(TDestination);
@@ -37,7 +37,8 @@ namespace Configuration
                 DestinationType = destinationType,
             };
             var existingConfiguration = GlobalConfiguration.DefinedMappingConfiurations;
-            if (existingConfiguration.ContainsKey((sourceType, destinationType))){
+            if (existingConfiguration.ContainsKey((sourceType, destinationType)))
+            {
                 existingConfiguration.Remove((sourceType, destinationType));
             }
             var mappingConfiguration = new MappingConfiguration<TSource, TDestination>()
@@ -49,11 +50,11 @@ namespace Configuration
                 PropertyMapActions = propertyMaps
             };
             mappingPair.MappingConfiguration = mappingConfiguration;
-            existingConfiguration.Add((sourceType, destinationType), mappingPair);
+            existingConfiguration.Add((sourceType, destinationType), mappingConfiguration);
         }
 
-        
-        
+
+
         #endregion Methods
     }
 }

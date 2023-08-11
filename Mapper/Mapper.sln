@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31205.134
+# Visual Studio Version 17
+VisualStudioVersion = 17.6.33723.286
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Models", "Models\Models.csproj", "{4256490D-4CDF-4EAD-A519-C06EFF359DCD}"
 EndProject
@@ -10,6 +10,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Infrastructure", "Infrastructure\Infrastructure.csproj", "{CD70B1DE-AA5F-410F-BD72-0D3B75A6FBF4}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mappings", "Mappings\Mappings.csproj", "{D413F416-6C84-487B-BEC2-24A6C31219C7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test", "Test\Test.csproj", "{04421DDD-88CC-4AB1-92FE-3FA891A117CC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{D413F416-6C84-487B-BEC2-24A6C31219C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D413F416-6C84-487B-BEC2-24A6C31219C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D413F416-6C84-487B-BEC2-24A6C31219C7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{04421DDD-88CC-4AB1-92FE-3FA891A117CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04421DDD-88CC-4AB1-92FE-3FA891A117CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04421DDD-88CC-4AB1-92FE-3FA891A117CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04421DDD-88CC-4AB1-92FE-3FA891A117CC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -121,11 +121,12 @@ namespace Program
             var drawing = new Drawing { MainShape = new Shape { IsGeometryShape = true }, Lines = new[] { new Line { Start = 0, End = 1, Name = "Line1" } } };
             var lines = new List<LineRest>();
             lines.Add(new LineRest { Start = 3, End = 4 });
-            var drawingRest = new DrawingRest { MainShape = new ShapeRest { IsGeometryShape = false }, Lines= lines};
+            var drawingRest = new DrawingRest { MainShape = new ShapeRest { IsGeometryShape = false }};
+            //drawingRest.Lines = lines; if we uncomment this line mapper should map lines to drawing.Lines,otherwise it's expected for mapper to set Lines to null on drawing in the next line
+            //When mapping configurations are implemented, it will be possible to set lines to be ignored on destination so they are never overriden to empty array if we don't want it.
             mapper.Map(drawingRest, drawing);
-            var x = drawing;
-            var y = mapper.Map<IDrawing>(drawingRest);
-            var z = mapper.Map<IEnumerable<IDrawing>>(new[] { drawingRest });
+            IDrawing newDrawing = mapper.Map<IDrawing>(drawingRest); //we should get newDrawing as a new object with all the properties from IDrawing and values set to the properties drawingRest has.
+            IEnumerable<IDrawing> drawings = mapper.Map<IEnumerable<IDrawing>>(new[] { drawingRest }); //as above but drawings should be a new IEnumerable<IDrawing> with the same amount of items as the source value set.
         }
     }
 

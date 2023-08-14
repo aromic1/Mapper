@@ -30,11 +30,12 @@ namespace Mappings
 
         #endregion Properties
 
-        private TDestination MapCore<TSource, TDestination>(TSource source, TDestination destination, Type defaultType = null)
+        private TDestination MapCore<TSource, TDestination>(TSource source, TDestination destination)
         {
             Type destinationType = destination?.GetType() ?? typeof(TDestination);
             if (typeof(IEnumerable).IsAssignableFrom(destinationType))
             {
+                //if destinationType is assignable from IEnumerable, but the sourceType isn't, the mapping should not be possible.
                 Type sourceType = source?.GetType() ?? typeof(TSource);
                 if (!typeof(IEnumerable).IsAssignableFrom(sourceType)) {
                     throw new Exception($"Cannot map from {sourceType.Name} to {destinationType.Name}.");
@@ -51,12 +52,15 @@ namespace Mappings
                     int i = 0;
                     foreach (var sourceItem in sourceEnumerable)
                     {
+                        //check this so in case there are more items in our source, we know when to pass null to MapCore instead of trying to access destinationList
+                        //by an index that is larger than the length of destinationList.
                         bool indexOutOfRange = destinationList.Count - 1 < i;
 
+                        //get the MapCore method so we can explicitly set source and destination types before making the method call.
                         var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
                         var underlyingType = destinationType.IsArray ? destinationType.GetElementType() : destinationType.GetGenericArguments()[0];
-                        var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourceItem.GetType(), defaultType ?? underlyingType );
-                        var mappedDestination = nonGenericMapMethod.Invoke(this, new[] { sourceItem, indexOutOfRange ? null : destinationList[i],null });
+                        var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourceItem.GetType(), underlyingType );
+                        var mappedDestination = nonGenericMapMethod.Invoke(this, new[] { sourceItem, indexOutOfRange ? null : destinationList[i] });
                         if (indexOutOfRange)
                         {
                             destinationList.Add(mappedDestination);
@@ -73,6 +77,8 @@ namespace Mappings
             }
             if (destination == null)
             {
+                //if our destination is null, we need to create an instance of the destination type. since we cant create an instance of an interface,
+                //we create a new type that implements that interface - has all the properties as our destination type and then create an object of that type.
                 if (typeof(TDestination).IsInterface)
                 {
                     destinationType = CreateClassTypeFromInterface(typeof(TDestination));
@@ -109,11 +115,11 @@ namespace Mappings
             dynamic destinationValue = Array.CreateInstance(underlyingType, source.Count());
             var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
             var nonGenericMapMethod = mapMethod.MakeGenericMethod(typeof(IEnumerable<dynamic>), typeof(TDestination));
-            var mappedDestination = (TDestination)nonGenericMapMethod.Invoke(this, new[] { source, destinationValue, underlyingType });
+            var mappedDestination = (TDestination)nonGenericMapMethod.Invoke(this, new[] { source, destinationValue });
             destinationValue = mappedDestination;
             return destinationValue;
         }
-
+        
         public TDestination Map<TDestination>(object source)
         {
             Type destinationType;
@@ -131,9 +137,17 @@ namespace Mappings
             return destination;
         }
 
+        /// <summary>
+        /// The DefaultMap used to map properties of source and destination whose types don't have mapping configuration set
+        /// </summary>
+        /// <typeparam name="TSource"></typeparam>
+        /// <typeparam name="TDestination"></typeparam>
+        /// <param name="source"></param>
+        /// <param name="destination"></param>
         private void DefaultMap<TSource, TDestination>(TSource source, TDestination destination)
         {
             var properties = destination.GetType().GetProperties();
+            //itterate trough destination properties and map the values from source properties with the same name
             foreach (var property in properties)
             {
                 var propertyType = property.PropertyType;
@@ -141,6 +155,7 @@ namespace Mappings
                 var sourceProperty = source.GetType().GetProperty(property.Name);
                 if(sourceProperty == null)
                 {
+                    //if there is no property on our source with the same name, continue
                     continue;
                 }
                 var sourcePropertyType = sourceProperty.PropertyType;
@@ -150,11 +165,13 @@ namespace Mappings
                 //    throw new Exception($"Cannot map property of type{sourcePropertyType.Name} to type{propertyType.Name}.");
                 //}
                 
+                //we need to handle string and dateTime separately because both are nonPrimitive types and need require handling
                 if (propertyType == typeof(string))
                 {
                     string newValue = null;
                     if(sourceValue != null)
                     {
+                        //make a copy of a string so it doesn't get passed by reference
                         newValue = string.Copy(sourceValue);
                     }
                     property.SetValue(destination, newValue);
@@ -174,6 +191,8 @@ namespace Mappings
                         {
                             destinationValue = Activator.CreateInstance(propertyType);
                         }
+                        //again creating a new instance of the property class type, explicitly setting source and destination types for the mapcore function to map 
+                        //Planing on extracting this to a separate method as I'm making multiple calls that are the same as this one here
                         var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
                         var nonGenericMapMethod = mapMethod.MakeGenericMethod(propertyType, sourcePropertyType);
                         nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue });
@@ -181,28 +200,33 @@ namespace Mappings
                     }
                     else if (typeof(IEnumerable).IsAssignableFrom(propertyType))
                     {
-                        var underlyingDestinationType = propertyType.GetGenericArguments()[0];
                         if (destinationValue == null)
                         {
+                            //get underlying source type so we can create an empty array of that type so we can then map it from sourceValue
+                            var underlyingDestinationType = propertyType.GetGenericArguments()[0];
                             destinationValue = Array.CreateInstance(underlyingDestinationType, sourceValue?.Count ?? 0);
                         }
                         var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
                         var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourcePropertyType, propertyType);
-                        var mappedDestination =  nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue,null });
+                        var mappedDestination =  nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue });
                         property.SetValue(destination, mappedDestination);
                     }
                     else if (propertyType.IsInterface)
                     {
+                        //if our destinationValue is null, we need to create an object of a type that implements the interface type of property
+                        //then we map the sourceValue to destinationValue and set the new value we get as the destinationValue
                         if(destinationValue == null)
                         {
                             destinationValue = Activator.CreateInstance(CreateClassTypeFromInterface(propertyType));
                         }
                         var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
                         var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourcePropertyType,propertyType );
-                         nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, null });
+                         nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue });
                         property.SetValue(destination, destinationValue);
                     }
                 }
+                //if we have primitive types that need to be mapped, we first need to check if destination value of this property is nullable
+                //in case sourceValue is null. If propertyType is not nullable and sourceValue is null, we skip updating the destination property value.
                 else if(Nullable.GetUnderlyingType(propertyType) != null || sourceValue != null)
                 {
                     property.SetValue(destination, sourceValue);
@@ -219,6 +243,7 @@ namespace Mappings
 
         private Type CreateClassTypeFromInterface(Type interfaceType)
         {
+            //collect all the properties from the interface type along with the inherited properties of that interface if there are any
             var properties = new List<PropertyInfo>();
             properties.AddRange(interfaceType.GetProperties());
             var interfacesToIterate = new List<Type>();
@@ -242,6 +267,9 @@ namespace Mappings
                 inheritedInterfaces = interfacesToIterate.ToArray();
             }
             while (inheritedInterfaces.Count() != 0);
+            
+            //create a new dynamic assembly, dynamic module builder and then using type builder define collected properties with their set and get method
+            //defined the same as they are on the passed interface.
             var assemblyName = new AssemblyName($"{interfaceType.Name}Assembly");
             var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
             var moduleBuilder = assemblyBuilder.DefineDynamicModule("DynamicModule");
@@ -249,7 +277,6 @@ namespace Mappings
             var typeBuilder = moduleBuilder.DefineType(typeName, TypeAttributes.Public);
 
             typeBuilder.AddInterfaceImplementation(interfaceType);
-
 
             foreach (var property in properties)
             {
@@ -268,6 +295,7 @@ namespace Mappings
             return typeBuilder.CreateType();
         }
 
+        //using Microsoft Intermediate Language Generator define the get method of the property.
         private static MethodBuilder BuildGetter(TypeBuilder typeBuilder, PropertyInfo property, FieldBuilder fieldBuilder, MethodAttributes attributes)
         {
             var getterBuilder = typeBuilder.DefineMethod($"get_{property.Name}", attributes, property.PropertyType, Type.EmptyTypes);
@@ -280,6 +308,7 @@ namespace Mappings
             return getterBuilder;
         }
 
+        //using Microsoft Intermediate Language Generator define the set method of the property.
         private static MethodBuilder BuildSetter(TypeBuilder typeBuilder, PropertyInfo property, FieldBuilder fieldBuilder, MethodAttributes attributes)
         {
             var setterBuilder = typeBuilder.DefineMethod($"set_{property.Name}", attributes, null, new Type[] { property.PropertyType });

@@ -53,9 +53,15 @@ namespace Program
 
         public class Drawing :IDrawing
         {
+            public Drawing(IDrawing? parent = null)
+            {
+                Parent = parent ?? this;
+            }
             public IShape MainShape { get; set; }
 
             public IEnumerable<ILine> Lines { get; set; }
+
+            public IDrawing Parent { get; set; }
         }
 
         public interface IDrawing
@@ -84,9 +90,15 @@ namespace Program
 
         public class DrawingRest
         {
+            public DrawingRest(DrawingRest? parent = null)
+            {
+                Parent = parent ?? this;
+            }
             public ShapeRest MainShape { get; set; }
 
             public IEnumerable<LineRest> Lines { get; set; }
+
+            public DrawingRest Parent { get; set; }
         }
 
         public class LineRest

@@ -17,6 +17,12 @@ namespace Mappings
 {
     public class Mapper : IMapper
     {
+        #region Fields
+
+        private int defaultMaxDepth = 5;
+
+        #endregion Fields
+
         #region Constructors
         public Mapper(IGlobalConfiguration globalConfiguration)
         {
@@ -30,8 +36,13 @@ namespace Mappings
 
         #endregion Properties
 
-        private TDestination MapCore<TSource, TDestination>(TSource source, TDestination destination)
+        private TDestination MapCore<TSource, TDestination>(TSource source, TDestination destination, int currentDepth = 0)
         {
+            currentDepth++;
+            if (currentDepth > defaultMaxDepth)
+            {
+                return destination;
+            }
             Type destinationType = destination?.GetType() ?? typeof(TDestination);
             if (typeof(IEnumerable).IsAssignableFrom(destinationType))
             {
@@ -60,7 +71,7 @@ namespace Mappings
                         var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
                         var underlyingType = destinationType.IsArray ? destinationType.GetElementType() : destinationType.GetGenericArguments()[0];
                         var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourceItem.GetType(), underlyingType );
-                        var mappedDestination = nonGenericMapMethod.Invoke(this, new[] { sourceItem, indexOutOfRange ? null : destinationList[i] });
+                        var mappedDestination = nonGenericMapMethod.Invoke(this, new[] { sourceItem, indexOutOfRange ? null : destinationList[i], currentDepth });
                         if (indexOutOfRange)
                         {
                             destinationList.Add(mappedDestination);
@@ -91,7 +102,7 @@ namespace Mappings
                 var newDestination = (TDestination)newInstance;
                 destination = newDestination;
             }
-            DefaultMap(source, destination);
+            DefaultMap(source, destination, currentDepth);
             return destination;
 
             //if (GlobalConfiguration.DefinedMappingConfiurations.TryGetValue((sourceType, destinationType), out object mappingConfiguration))
@@ -115,7 +126,7 @@ namespace Mappings
             dynamic destinationValue = Array.CreateInstance(underlyingType, source.Count());
             var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
             var nonGenericMapMethod = mapMethod.MakeGenericMethod(typeof(IEnumerable<dynamic>), typeof(TDestination));
-            var mappedDestination = (TDestination)nonGenericMapMethod.Invoke(this, new[] { source, destinationValue });
+            var mappedDestination = (TDestination)nonGenericMapMethod.Invoke(this, new[] { source, destinationValue, 0 });
             destinationValue = mappedDestination;
             return destinationValue;
         }
@@ -144,7 +155,7 @@ namespace Mappings
         /// <typeparam name="TDestination"></typeparam>
         /// <param name="source"></param>
         /// <param name="destination"></param>
-        private void DefaultMap<TSource, TDestination>(TSource source, TDestination destination)
+        private void DefaultMap<TSource, TDestination>(TSource source, TDestination destination, int currentDepth)
         {
             var properties = destination.GetType().GetProperties();
             //itterate trough destination properties and map the values from source properties with the same name
@@ -195,7 +206,7 @@ namespace Mappings
                         //Planing on extracting this to a separate method as I'm making multiple calls that are the same as this one here
                         var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
                         var nonGenericMapMethod = mapMethod.MakeGenericMethod(propertyType, sourcePropertyType);
-                        nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue });
+                        nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, currentDepth });
                         property.SetValue(destination, destinationValue);
                     }
                     else if (typeof(IEnumerable).IsAssignableFrom(propertyType))
@@ -208,7 +219,7 @@ namespace Mappings
                         }
                         var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
                         var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourcePropertyType, propertyType);
-                        var mappedDestination =  nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue });
+                        var mappedDestination =  nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue,currentDepth });
                         property.SetValue(destination, mappedDestination);
                     }
                     else if (propertyType.IsInterface)
@@ -221,7 +232,7 @@ namespace Mappings
                         }
                         var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
                         var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourcePropertyType,propertyType );
-                         nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue });
+                         nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, currentDepth });
                         property.SetValue(destination, destinationValue);
                     }
                 }

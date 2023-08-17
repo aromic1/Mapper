@@ -69,6 +69,7 @@ namespace Program
             public IShape MainShape { get; set; }
         
             public IEnumerable<ILine> Lines { get; set; }
+            public IDrawing Parent { get; set; }
         }
 
         public class ShapeRest

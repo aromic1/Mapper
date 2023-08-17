@@ -134,6 +134,7 @@ namespace Mappings
         public TDestination Map<TDestination>(object source)
         {
             Type destinationType;
+            TDestination destination;
             if (typeof(TDestination).IsInterface)
             {
                 destinationType = CreateClassTypeFromInterface(typeof(TDestination));
@@ -142,8 +143,17 @@ namespace Mappings
             {
                 destinationType = typeof(TDestination);
             }
-            var newInstance = Activator.CreateInstance(destinationType);
-            var destination = (TDestination)newInstance;
+            try
+            {
+                var newInstance = Activator.CreateInstance(destinationType);
+                destination = (TDestination)newInstance;
+            }
+            catch(Exception ex)
+            {
+                var exceptionToThrow = new StringBuilder(ex.Message);
+                exceptionToThrow.Append(". Define a parametarless constructor or set this property to be ignored.");
+                throw new Exception(exceptionToThrow.ToString());
+            }
             MapCore(source, destination);
             return destination;
         }
@@ -200,6 +210,11 @@ namespace Mappings
                     {
                         if (destinationValue == null)
                         {
+                            //if currentDepth is equal to defaultMaxDepth, we don't want to create a new empty object because MapCore method will not map it anyway. So we leave it null. 
+                            if (currentDepth == defaultMaxDepth)
+                            {
+                                continue;
+                            }
                             destinationValue = Activator.CreateInstance(propertyType);
                         }
                         //again creating a new instance of the property class type, explicitly setting source and destination types for the mapcore function to map 
@@ -213,6 +228,11 @@ namespace Mappings
                     {
                         if (destinationValue == null)
                         {
+                            //if currentDepth is equal to defaultMaxDepth, we don't want to create a new empty array because MapCore method will not map it anyway. So we leave it null.
+                            if (currentDepth == defaultMaxDepth)
+                            {
+                                continue;
+                            }
                             //get underlying source type so we can create an empty array of that type so we can then map it from sourceValue
                             var underlyingDestinationType = propertyType.GetGenericArguments()[0];
                             destinationValue = Array.CreateInstance(underlyingDestinationType, sourceValue?.Count ?? 0);
@@ -228,6 +248,11 @@ namespace Mappings
                         //then we map the sourceValue to destinationValue and set the new value we get as the destinationValue
                         if(destinationValue == null)
                         {
+                            //if currentDepth is equal to defaultMaxDepth, we don't want to create a new empty object because MapCore method will not map it anyway. So we leave it null.
+                            if (currentDepth == defaultMaxDepth)
+                            {
+                                continue;
+                            }
                             destinationValue = Activator.CreateInstance(CreateClassTypeFromInterface(propertyType));
                         }
                         var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);

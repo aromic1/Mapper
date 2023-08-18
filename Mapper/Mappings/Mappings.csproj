@@ -43,6 +43,7 @@
   <ItemGroup>
     <Compile Include="IMapper.cs" />
     <Compile Include="Mapper.cs" />
+    <Compile Include="MapperException.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

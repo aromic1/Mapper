@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Dynamic;
 using System.Linq;
 using System.Reflection;
@@ -48,7 +49,8 @@ namespace Mappings
             {
                 //if destinationType is assignable from IEnumerable, but the sourceType isn't, the mapping should not be possible.
                 Type sourceType = source?.GetType() ?? typeof(TSource);
-                if (!typeof(IEnumerable).IsAssignableFrom(sourceType)) {
+                if (!typeof(IEnumerable).IsAssignableFrom(sourceType))
+                {
                     throw new Exception($"Cannot map from {sourceType.Name} to {destinationType.Name}.");
                 }
                 else
@@ -70,7 +72,7 @@ namespace Mappings
                         //get the MapCore method so we can explicitly set source and destination types before making the method call.
                         var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
                         var underlyingType = destinationType.IsArray ? destinationType.GetElementType() : destinationType.GetGenericArguments()[0];
-                        var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourceItem.GetType(), underlyingType );
+                        var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourceItem.GetType(), underlyingType);
                         var mappedDestination = nonGenericMapMethod.Invoke(this, new[] { sourceItem, indexOutOfRange ? null : destinationList[i], currentDepth });
                         if (indexOutOfRange)
                         {
@@ -130,7 +132,7 @@ namespace Mappings
             destinationValue = mappedDestination;
             return destinationValue;
         }
-        
+
         public TDestination Map<TDestination>(object source)
         {
             Type destinationType;
@@ -148,7 +150,7 @@ namespace Mappings
                 var newInstance = Activator.CreateInstance(destinationType);
                 destination = (TDestination)newInstance;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 var exceptionToThrow = new StringBuilder(ex.Message);
                 exceptionToThrow.Append(". Define a parametarless constructor or set this property to be ignored.");
@@ -174,7 +176,7 @@ namespace Mappings
                 var propertyType = property.PropertyType;
                 dynamic destinationValue = property.GetValue(destination);
                 var sourceProperty = source.GetType().GetProperty(property.Name);
-                if(sourceProperty == null)
+                if (sourceProperty == null)
                 {
                     //if there is no property on our source with the same name, continue
                     continue;
@@ -185,21 +187,21 @@ namespace Mappings
                 //{
                 //    throw new Exception($"Cannot map property of type{sourcePropertyType.Name} to type{propertyType.Name}.");
                 //}
-                
+
                 //we need to handle string and dateTime separately because both are nonPrimitive types and need require handling
                 if (propertyType == typeof(string))
                 {
                     string newValue = null;
-                    if(sourceValue != null)
+                    if (sourceValue != null)
                     {
                         //make a copy of a string so it doesn't get passed by reference
                         newValue = string.Copy(sourceValue);
                     }
                     property.SetValue(destination, newValue);
                 }
-                else if(propertyType == typeof(DateTime) || propertyType == typeof(DateTime?))
+                else if (propertyType == typeof(DateTime) || propertyType == typeof(DateTime?))
                 {
-                    if(!(sourceValue == null && propertyType==typeof(DateTime)))
+                    if (!(sourceValue == null && propertyType == typeof(DateTime)))
                     {
                         property.SetValue(destination, sourceValue);
                     }
@@ -239,14 +241,14 @@ namespace Mappings
                         }
                         var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
                         var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourcePropertyType, propertyType);
-                        var mappedDestination =  nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue,currentDepth });
+                        var mappedDestination = nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, currentDepth });
                         property.SetValue(destination, mappedDestination);
                     }
                     else if (propertyType.IsInterface)
                     {
                         //if our destinationValue is null, we need to create an object of a type that implements the interface type of property
                         //then we map the sourceValue to destinationValue and set the new value we get as the destinationValue
-                        if(destinationValue == null)
+                        if (destinationValue == null)
                         {
                             //if currentDepth is equal to defaultMaxDepth, we don't want to create a new empty object because MapCore method will not map it anyway. So we leave it null.
                             if (currentDepth == defaultMaxDepth)
@@ -256,14 +258,14 @@ namespace Mappings
                             destinationValue = Activator.CreateInstance(CreateClassTypeFromInterface(propertyType));
                         }
                         var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
-                        var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourcePropertyType,propertyType );
-                         nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, currentDepth });
+                        var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourcePropertyType, propertyType);
+                        nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, currentDepth });
                         property.SetValue(destination, destinationValue);
                     }
                 }
                 //if we have primitive types that need to be mapped, we first need to check if destination value of this property is nullable
                 //in case sourceValue is null. If propertyType is not nullable and sourceValue is null, we skip updating the destination property value.
-                else if(Nullable.GetUnderlyingType(propertyType) != null || sourceValue != null)
+                else if (Nullable.GetUnderlyingType(propertyType) != null || sourceValue != null)
                 {
                     property.SetValue(destination, sourceValue);
                 }
@@ -277,7 +279,7 @@ namespace Mappings
         //    mappingConfiguration.AfterMap?.Invoke(source, destination);
         //}
 
-        private Type CreateClassTypeFromInterface(Type interfaceType)
+        public Type CreateClassTypeFromInterface(Type interfaceType)
         {
             //collect all the properties from the interface type along with the inherited properties of that interface if there are any
             var properties = new List<PropertyInfo>();
@@ -303,7 +305,7 @@ namespace Mappings
                 inheritedInterfaces = interfacesToIterate.ToArray();
             }
             while (inheritedInterfaces.Count() != 0);
-            
+
             //create a new dynamic assembly, dynamic module builder and then using type builder define collected properties with their set and get method
             //defined the same as they are on the passed interface.
             var assemblyName = new AssemblyName($"{interfaceType.Name}Assembly");
@@ -328,7 +330,15 @@ namespace Mappings
                 propertyBuilder.SetGetMethod(getterBuilder);
                 propertyBuilder.SetSetMethod(setterBuilder);
             }
-            return typeBuilder.CreateType();
+            try
+            {
+                return typeBuilder.CreateType();
+
+            }
+            catch (Exception ex)
+            {
+                throw new MapperException();
+            }
         }
 
         //using Microsoft Intermediate Language Generator define the get method of the property.

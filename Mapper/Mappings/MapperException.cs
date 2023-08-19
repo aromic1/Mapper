@@ -6,7 +6,13 @@ using System.Threading.Tasks;
 
 namespace Mappings
 {
-    public class MapperException: Exception
+    public class MapperException : Exception
     {
+        public MapperException() { }
+
+        public MapperException(string message) : base(message)
+        {
+        }
+
     }
 }

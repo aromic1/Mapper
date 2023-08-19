@@ -22,6 +22,8 @@ namespace Mappings
 
         private int defaultMaxDepth = 5;
 
+        private Dictionary<Type, Type> TypesFromInterfaces = new Dictionary<Type, Type>();
+
         #endregion Fields
 
         #region Constructors
@@ -51,7 +53,7 @@ namespace Mappings
                 Type sourceType = source?.GetType() ?? typeof(TSource);
                 if (!typeof(IEnumerable).IsAssignableFrom(sourceType))
                 {
-                    throw new Exception($"Cannot map from {sourceType.Name} to {destinationType.Name}.");
+                    throw new MapperException($"Cannot map from {sourceType.Name} to {destinationType.Name}.");
                 }
                 else
                 {
@@ -136,26 +138,32 @@ namespace Mappings
         public TDestination Map<TDestination>(object source)
         {
             Type destinationType;
-            TDestination destination;
-            if (typeof(TDestination).IsInterface)
-            {
-                destinationType = CreateClassTypeFromInterface(typeof(TDestination));
+            object newInstance;
+            if(TypesFromInterfaces.TryGetValue(typeof(TDestination), out var instanceObject)){
+                newInstance = instanceObject;
             }
             else
             {
-                destinationType = typeof(TDestination);
+                if (typeof(TDestination).IsInterface)
+                {
+                    destinationType = CreateClassTypeFromInterface(typeof(TDestination));
+                }
+                else
+                {
+                    destinationType = typeof(TDestination);
+                }
+                try
+                {
+                    newInstance = Activator.CreateInstance(destinationType);
+                }
+                catch (Exception ex)
+                {
+                    var exceptionToThrow = new StringBuilder(ex.Message);
+                    exceptionToThrow.Append(". Define a parametarless constructor or set this property to be ignored.");
+                    throw new MapperException(exceptionToThrow.ToString());
+                }
             }
-            try
-            {
-                var newInstance = Activator.CreateInstance(destinationType);
-                destination = (TDestination)newInstance;
-            }
-            catch (Exception ex)
-            {
-                var exceptionToThrow = new StringBuilder(ex.Message);
-                exceptionToThrow.Append(". Define a parametarless constructor or set this property to be ignored.");
-                throw new Exception(exceptionToThrow.ToString());
-            }
+            TDestination destination = (TDestination)newInstance;
             MapCore(source, destination);
             return destination;
         }
@@ -169,46 +177,42 @@ namespace Mappings
         /// <param name="destination"></param>
         private void DefaultMap<TSource, TDestination>(TSource source, TDestination destination, int currentDepth)
         {
-            var properties = destination.GetType().GetProperties();
-            //itterate trough destination properties and map the values from source properties with the same name
+            var properties = destination.GetType().GetProperties().Where(x => x.CanWrite && x.SetMethod.IsPublic);
+            //itterate trough destination properties that have setter method defined and map the values from source properties with the same name
             foreach (var property in properties)
             {
                 var propertyType = property.PropertyType;
                 dynamic destinationValue = property.GetValue(destination);
                 var sourceProperty = source.GetType().GetProperty(property.Name);
-                if (sourceProperty == null)
+                if (sourceProperty == null || !sourceProperty.CanRead || !sourceProperty.GetMethod.IsPublic)
                 {
-                    //if there is no property on our source with the same name, continue
+                    //if there is no property on our source with the same name or the sourceProperty does not have a getter, continue
                     continue;
                 }
                 var sourcePropertyType = sourceProperty.PropertyType;
+                ValidatePropertyTypes(sourcePropertyType, propertyType);
                 dynamic sourceValue = sourceProperty.GetValue(source);
-                //if (!ValidatePropertyTypes(sourcePropertyType, propertyType))
-                //{
-                //    throw new Exception($"Cannot map property of type{sourcePropertyType.Name} to type{propertyType.Name}.");
-                //}
-
-                //we need to handle string and dateTime separately because both are nonPrimitive types and need require handling
-                if (propertyType == typeof(string))
+                if (sourceValue == null)
                 {
-                    string newValue = null;
-                    if (sourceValue != null)
-                    {
-                        //make a copy of a string so it doesn't get passed by reference
-                        newValue = string.Copy(sourceValue);
-                    }
-                    property.SetValue(destination, newValue);
-                }
-                else if (propertyType == typeof(DateTime) || propertyType == typeof(DateTime?))
-                {
-                    if (!(sourceValue == null && propertyType == typeof(DateTime)))
+                    if (destinationValue != null)
                     {
                         property.SetValue(destination, sourceValue);
                     }
+                    //if both source and destination value are null, nothing to do here. Also if we already set property's value to null -> continue.
+                    continue;
                 }
+                //we need to handle string and dateTime separately because both are nonPrimitive types and need require handling
                 else if (!propertyType.IsPrimitive)
                 {
-                    if (propertyType.IsClass)
+                    if (propertyType == typeof(string))
+                    {
+                        property.SetValue(destination, string.Copy(sourceValue));
+                    }
+                    else if (propertyType == typeof(Guid?) || propertyType == typeof(Guid?) || propertyType == typeof(DateTime) || propertyType == typeof(DateTime?))
+                    {
+                        property.SetValue(destination, sourceValue);
+                    }
+                    else if (propertyType.IsClass)
                     {
                         if (destinationValue == null)
                         {
@@ -263,12 +267,10 @@ namespace Mappings
                         property.SetValue(destination, destinationValue);
                     }
                 }
-                //if we have primitive types that need to be mapped, we first need to check if destination value of this property is nullable
-                //in case sourceValue is null. If propertyType is not nullable and sourceValue is null, we skip updating the destination property value.
-                else if (Nullable.GetUnderlyingType(propertyType) != null || sourceValue != null)
+                else
                 {
                     property.SetValue(destination, sourceValue);
-                }
+                }      
             }
         }
 
@@ -281,6 +283,10 @@ namespace Mappings
 
         public Type CreateClassTypeFromInterface(Type interfaceType)
         {
+            if (TypesFromInterfaces.TryGetValue(interfaceType, out var type))
+            {
+                return type;
+            }
             //collect all the properties from the interface type along with the inherited properties of that interface if there are any
             var properties = new List<PropertyInfo>();
             properties.AddRange(interfaceType.GetProperties());
@@ -296,7 +302,7 @@ namespace Mappings
                     var props = inheritedInterface.GetProperties();
                     foreach (var prop in props)
                     {
-                        if (!properties.Contains(prop))
+                        if (!properties.Select(x => x.Name).Contains(prop.Name))
                         {
                             properties.Add(prop);
                         }
@@ -320,24 +326,28 @@ namespace Mappings
             {
                 var fieldName = $"<{property.Name}>proxy";
 
-                var propertyBuilder = typeBuilder.DefineProperty(property.Name, System.Reflection.PropertyAttributes.None, property.PropertyType, Type.EmptyTypes);
+                var propertyBuilder = typeBuilder.DefineProperty(property.Name, PropertyAttributes.None, property.PropertyType, Type.EmptyTypes);
 
                 var fieldBuilder = typeBuilder.DefineField(fieldName, property.PropertyType, FieldAttributes.Private);
 
                 var getSetAttributes = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.Virtual;
                 var getterBuilder = BuildGetter(typeBuilder, property, fieldBuilder, getSetAttributes);
-                var setterBuilder = BuildSetter(typeBuilder, property, fieldBuilder, getSetAttributes);
                 propertyBuilder.SetGetMethod(getterBuilder);
-                propertyBuilder.SetSetMethod(setterBuilder);
+                if (property.CanWrite)
+                {
+                    var setterBuilder = BuildSetter(typeBuilder, property, fieldBuilder, getSetAttributes);
+                    propertyBuilder.SetSetMethod(setterBuilder);
+                }
             }
             try
             {
-                return typeBuilder.CreateType();
-
+                var newType = typeBuilder.CreateType();
+                TypesFromInterfaces.Add(interfaceType, newType);
+                return newType;
             }
-            catch (Exception ex)
+            catch
             {
-                throw new MapperException();
+                throw new MapperException($"Make sure your interface {interfaceType.Name} is public.");
             }
         }
 
@@ -367,30 +377,34 @@ namespace Mappings
 
             return setterBuilder;
         }
-        private bool ValidatePropertyTypes(Type sourcePropertyType, Type destinationPropertyType)
+
+        private void ValidatePropertyTypes(Type sourcePropertyType, Type destinationPropertyType)
         {
             if (sourcePropertyType != destinationPropertyType)
             {
-                if ((destinationPropertyType.IsInterface && (sourcePropertyType.IsClass || sourcePropertyType.IsInterface)))
+                if (destinationPropertyType.IsInterface )
                 {
-                    return false;
+                    if (!(sourcePropertyType.IsClass || sourcePropertyType.IsInterface))
+                    {
+                        throw new MapperException($"Cannot map property {sourcePropertyType.Name} to {destinationPropertyType.Name}. Check their types");
+                    }
+                    return;
                 }
                 if (typeof(IEnumerable).IsAssignableFrom(destinationPropertyType))
                 {
-                    if (typeof(IEnumerable).IsAssignableFrom(sourcePropertyType))
+                    if (!typeof(IEnumerable).IsAssignableFrom(sourcePropertyType))
                     {
-                        return false;
+                        throw new MapperException($"Cannot map property {sourcePropertyType.Name} to {destinationPropertyType.Name}. Check their types.");
                     }
                     else
                     {
                         var underlyingSourcePropertyType = sourcePropertyType.GetEnumUnderlyingType();
                         var underlyingPropertyType = destinationPropertyType.GetEnumUnderlyingType();
-                        return ValidatePropertyTypes(underlyingSourcePropertyType, underlyingPropertyType);
+                        ValidatePropertyTypes(underlyingSourcePropertyType, underlyingPropertyType);
                     }
                 }
-                return false;
+                throw new MapperException($"Cannot map property {sourcePropertyType.Name} to {destinationPropertyType.Name}. Make sure their type is the same.");
             }
-            return true;
         }
     }
 }

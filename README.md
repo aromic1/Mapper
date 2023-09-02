@@ -186,6 +186,7 @@ This project revolves around the central concept of reflection, driven by my per
 
 This tool finds its purpose particularly in the realms of web development and projects employing the "onion-layer" architecture. By seamlessly bridging the gap between entity, domain, and REST models, it becomes an indispensable asset in mapping data across different layers of a software system.
 The main difference between this tool and AutoMapper is that AutoMapper uses Expressions which are a combination of operands (variables, literals, method calls) and operators that can be evaluated to a single value. With AutoMapper you have the advantage to set a more complex configuration between the types then with this Mapper, but it also has flaws, especially when no mapping configuration is defined, sometimes it works very randomly. When you do not have a configuration set, sometimes it throws an exception.
+![AutoMapperConfigException](https://github.com/aromic1/Mapper/assets/138440619/a2e5174b-7ea0-4c7c-9fa0-8699bbd76db7)
 
 , but sometimes it works without setting the configuration. 
 

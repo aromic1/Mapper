@@ -1,21 +1,55 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Models
 {
     public class MappingConfiguration<TSource, TDestination> : IMappingConfiguration<TSource, TDestination>
     {
-        public Action<TSource, TDestination> BeforeMap { get; set; }
+        #region Properties
 
-        public Action<TSource, TDestination> AfterMap { get; set; }
+        public Action<TSource, TDestination> BeforeMap { get; private set; }
 
-        public IEnumerable<string> IgnoreProperties { get; set; }
+        public IEnumerable<string> IgnoreProperties { get; private set; }
 
-        public Dictionary<string, string> MapFromPropertyOverrides { get; set; }
+        public Action<TSource,TDestination> AfterMap { get; private set; }
 
-        public Dictionary<string, Action<TSource,TDestination>> PropertyMapActions { get; set; }
+        public int? MaxDepth { get; private set; }
+
+        #endregion Properties
+
+        #region Methods
+
+        public IMappingConfiguration<TSource, TDestination> Ignore(string propertyToIgnore)
+        {
+            this.IgnoreProperties = this.IgnoreProperties?.Any() == true ? this.IgnoreProperties.Append(propertyToIgnore) : new[] { propertyToIgnore };
+            return this;
+        }
+
+        public IMappingConfiguration<TSource, TDestination> IgnoreMany(IEnumerable<string> propertiesToIgnore)
+        {
+            this.IgnoreProperties = this.IgnoreProperties?.Any() == true ? this.IgnoreProperties.Concat(propertiesToIgnore) : propertiesToIgnore;
+            return this;
+        }
+
+        public IMappingConfiguration<TSource, TDestination> DefineBeforeMap(Action<TSource, TDestination> beforeMap)
+        {
+            this.BeforeMap = beforeMap;
+            return this;
+        }
+
+        public IMappingConfiguration<TSource, TDestination> DefineAfterMap(Action<TSource, TDestination> afterMap)
+        {
+            this.AfterMap = afterMap;
+            return this;
+        }
+
+        public IMappingConfiguration<TSource, TDestination> SetMaxDepth(int maxDepth)
+        {
+            this.MaxDepth = maxDepth;
+            return this;
+        }
+
+        #endregion Methods
     }
 }

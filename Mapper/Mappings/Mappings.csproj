@@ -47,9 +47,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Infrastructure\Infrastructure.csproj">
-      <Project>{cd70b1de-aa5f-410f-bd72-0d3b75a6fbf4}</Project>
-      <Name>Infrastructure</Name>
+    <ProjectReference Include="..\Configuration\Configuration.csproj">
+      <Project>{aec9cd83-a7ac-41b6-b24f-8488b13ab5c2}</Project>
+      <Name>Configuration</Name>
     </ProjectReference>
     <ProjectReference Include="..\Models\Models.csproj">
       <Project>{4256490d-4cdf-4ead-a519-c06eff359dcd}</Project>

@@ -42,9 +42,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="IMappingConfiguration.cs" />
-    <Compile Include="IMappingPair.cs" />
     <Compile Include="MappingConfiguration.cs" />
-    <Compile Include="MappingPair.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

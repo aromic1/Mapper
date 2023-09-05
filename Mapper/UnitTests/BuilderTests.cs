@@ -1,18 +1,15 @@
-using System.Linq.Expressions;
-using Infrastructure;
 using Mappings;
-using NUnit;
 
 namespace UnitTests
 {
     public class BuilderTests
     {
-        interface IUnaryNode
+        private interface IUnaryNode
         {
             public IUnaryNode? Next
             {
                 get => null;
-                
+
                 set
                 {
                     throw new Exception();
@@ -20,12 +17,10 @@ namespace UnitTests
             }
         }
 
-
         [Test]
         public void ClassFromInterface_IUnaryNode()
         {
-            var globalConfig = new GlobalConfiguration();
-            var mapper = new Mapper(globalConfig);
+            var mapper = new Mapper();
 
             try
             {
@@ -39,7 +34,6 @@ namespace UnitTests
             {
                 Assert.Fail();
             }
-
         }
     }
 }

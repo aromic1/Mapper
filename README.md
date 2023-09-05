@@ -20,7 +20,14 @@ It contains 3 map method overloads:
 
 ## Configurationless mapping
 
-If using this aproach you need to understand that Mapper will map them "by default" - by gathering all common (that have the same name) properties between the two types and setting values from source object properties to destination object properties. 
+Simply create an instance of the Mapper class using its default constructor. Afterward, utilize the mapper's map functions to perform object mapping:
+```
+var mapper = new Mapper();
+ClassA objectA = new ClassA() { Name = "Name" };
+ClassB objectB = new ClassB() { Name = "NoName"};
+mapper.Map(objectA, objectB);
+```
+When employing this approach, it's important to understand that the Mapper performs mapping "by default." It accomplishes this by identifying and matching properties with the same names between the two types and transferring values from the source object's properties to the destination object's properties. In the given example, objectB's Name property will be updated to "Name" instead of retaining its original value, "NoName."
 
 If the destination's property value is null, you can expect the outcome depending on your property's type
 
@@ -141,7 +148,7 @@ The tests have been executed successfully.
 
 In the context of the mapping process, cyclic data structures refer to scenarios where an object's properties create a loop, ultimately leading back to the original object. This intricate structure can cause issues, particularly stack overflow exceptions, when trying to map these objects due to the recursive nature of the mapping process. To mitigate this concern, a safeguard mechanism has been implemented, and this safeguard is what we refer to as the "max depth setting."
 
-By default, the max depth setting is set to 5, representing a limit on the number of nested levels the mapper will traverse during the mapping process. This is done to prevent infinite loops and the associated stack overflow exceptions. Let's delve into an example to illustrate this further:
+By default, the max depth setting is set to 50, representing a limit on the number of nested levels the mapper will traverse during the mapping process. This is done to prevent infinite loops and the associated stack overflow exceptions. Let's delve into an example to illustrate this further:
 
 Consider a source object with multiple levels of properties:
 
@@ -161,7 +168,7 @@ sourceObject = {
 }
 ```
 
-In this scenario, the source properties are nested within each other up to five levels. When mapping this source object to a destination, the default max depth setting of 5 comes into play. The mapper will traverse through the properties and map them to the destination object until it reaches the fifth level, i.e., sourceProperty5. At this point, the mapper will halt its mapping process to avoid exceeding the defined depth limit. As a result, the properties nested beyond this level will not be mapped further.
+In this scenario, the source properties are nested within each other up to five levels. When mapping this source object to a destination, the default max depth setting of 50 comes into play. Lets say it is actually set to 5 instead of 50. The mapper will traverse through the properties and map them to the destination object until it reaches the fifth level, i.e., sourceProperty5. At this point, the mapper will halt its mapping process to avoid exceeding the defined depth limit. As a result, the properties nested beyond this level will not be mapped further.
 
 However, there might be cases where you need the mapper to delve deeper into the structure than the default depth. This could arise if you have a specific use case that demands a deeper mapping hierarchy. To cater to such situations, the default max depth setting can be overridden within your configuration. By setting a custom max depth value, you can instruct the mapper to traverse more layers of nested properties during the mapping process, accommodating your unique requirements.
 
@@ -169,8 +176,63 @@ In essence, the default max depth setting serves as a protective measure to prev
 
 ## Configuration setup
 
-By setting the configuration user can define mapping rules which the mapper will then follow when mapping objects. For example you can define which properties can be ignored during the mapping, or you can define that you want to map value from property "A" on the source to the property "B" on the destination. AfterMap and BeforeMap functions can be defined in the configuration which are then invoked before/after the actual map.
-... WIll write more after I implement configuration.
+To utilize this functionality this is what you need to do. There are 2 options to begin with.
+1) Create instance of Configuration and then call the ```CreateMap<TSource,TDestination>()``` that creates a mapping configuration between your TSource and TDestination types. After that when you create an instance of the Mapper, pass the configuration to it's constructor.
+    ```
+    var configuration = new Configuration.Configuration();
+    configuration.CreateMap<ClassA, ClassB>();
+    var mapper = new Mapper(configuration);
+    ```
+2) If you wish for your configuration to be set somewhere other then the function you are actually doing the mapping, you can create your own Configuration class that inherits Configuration and then define your mapping configurations in that class.
+     ```
+        public class TestConfiguration : Configuration.Configuration
+        {
+            public TestConfiguration()
+            {
+                CreateMap<ClassA, ClassB>();
+                CreateMap<ShapeRest, IShape>();
+            }
+        }
+     ```
+    And then when you create an instance of mapper you can pass an instance of your own Configuration class to it.
+    ```
+    var configuration = new TestConfiguration();
+    configuration.CreateMap<ClassA, ClassB>();
+    var mapper = new Mapper(configuration);  
+    ```
+You can either use aproach 1 or aproach 2, but in both cases, there are 5 functions you can call on your created mappingConfigurations.
+-  ```Ignore(string propertyToIgnore)``` will set the destination property with this name to be ignored during the mapping process. It's value will stay the same as it was on the destination when the map function was called.
+-  ```IgnoreMany(string propertyToIgnore)``` Sets the destination properties with the names passed to be ignored during the mapping process. The value of these properties will stay the same as it was on the destination when the map function was called.
+-  ```DefineBeforeMap(Action<TSource, TDestination> beforeMap)``` Sets the passed action as the action that will be invoked before the mapping process between TSource and TDestination starts.
+-  ```DefineAfterMap(Action<TSource, TDestination> afterMap)``` Sets the passed action as the action that will be invoked after the mapping process between TSource and TDestination starts.
+-  ```SetMaxDepth(int maxDepth)``` Overrides the defaultMaxDepth setting mentioned before (50) and sets the passed int as max depth meaning that the mapper will traverse through the properties and map them to the destination object until it reaches this level. During the mapping process, only the max depth set between the types of the core object that are being mapped is considered, else the max depth is equal to defaultMaxDepth (50).
+
+Here is an example of how you can use this functions.
+```
+public class TestConfiguration : Configuration.Configuration
+{
+    public TestConfiguration()
+    {
+        CreateMap<DrawingRest, IDrawing>().IgnoreMany(new[] { "Id", "Author" })
+            .DefineAfterMap((source,destination) =>
+            {
+                if(destination.MainShape?.IsGeometryShape == true)
+                {
+                    destination.Author = new Author("FirstName", "LastName");
+                }
+            }).SetMaxDepth(7);
+        CreateMap<LineRest, ILine>().Ignore("Start").SetMaxDepth(3)
+            .DefineBeforeMap((source,destination) => 
+            {
+                if(source.Start > source.End)
+                {
+                    source.Start = 0;    
+                }
+            }
+            });
+    }
+}
+```
 
 ### Things you should know about when using Mapper
 
@@ -185,11 +247,11 @@ By setting the configuration user can define mapping rules which the mapper will
 This project revolves around the central concept of reflection, driven by my personal quest for deeper understanding and knowledge in the field. Delving into the world of reflection was a deliberate choice, inspired by the desire to explore its inner workings and capabilities. The tool that emerged from this endeavor was born from the inspiration provided by AutoMapper, sparking the idea of crafting a bespoke solution catering to similar needs.
 
 This tool finds its purpose particularly in the realms of web development and projects employing the "onion-layer" architecture. By seamlessly bridging the gap between entity, domain, and REST models, it becomes an indispensable asset in mapping data across different layers of a software system.
-The main difference between this tool and AutoMapper is that AutoMapper uses Expressions which are a combination of operands (variables, literals, method calls) and operators that can be evaluated to a single value. With AutoMapper you have the advantage to set a more complex configuration between the types then with this Mapper, but it also has flaws, especially when no mapping configuration is defined, sometimes it works very randomly. When you do not have a configuration set, sometimes it throws an exception.
+The main difference between this tool and AutoMapper is that AutoMapper uses Expressions which are a combination of operands (variables, literals, method calls) and operators that can be evaluated to a single value. With AutoMapper you have the advantage to set a more complex configuration between the types then with this Mapper, but it also has flaws, especially when no mapping configuration is defined, sometimes it works very randomly. When you do not have a configuration set, sometimes it throws an exception
 ![AutoMapperConfigException](https://github.com/aromic1/Mapper/assets/138440619/a2e5174b-7ea0-4c7c-9fa0-8699bbd76db7)
 
-, but sometimes it works without setting the configuration. 
+, but sometimes it works even without setting the configuration. 
 
-With this mapper, if you have no configuration set, the mapping is pretty straight forward. It iterates trought the destination properties and sets the values from the source to the properties that are common following the rules mentioned in the previous paragraph. This mapper's code, I believe, is easier to read then the one AutoMapper has, especially for beginners using this mapper that want to check the source code to see how something works. Also, AutoMapper has some issues with Ignoring properties that are set to be ignored withing configuration when mapping the "deep" properties of the object, so I will try to make this Mapper without these issues.
+This tool works more intuitively than AutoMapper by default. The goal of this project was to make a mapper that can map the objects in the simplest way possible, you just need to define your source and it's type along with destination and destination type and the mapper will do the mapping for you. It iterates trought the destination properties and sets the values from the source to the properties that are common following the rules mentioned in the previous paragraph. You don't need to set any configuration at all if you don't need it for a specific reason. On the other hand, if you do need it, there are a few ways in which you can alter the mapper behavior, all mentioned in the "Configuration setup" paragraph.
 
 In essence, this project stands as a testament to the exploration of reflection and its practical applications, empowered by the lessons learned from established tools like AutoMapper.

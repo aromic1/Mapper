@@ -31,12 +31,12 @@ When employing this approach, it's important to understand that the Mapper perfo
 
 If the destination's property value is null, you can expect the outcome depending on your property's type
 
-- Class type - Activator.CreateInstance will be called for destination's property type. It uses the default class constructor to create a new object of that class. You need to be careful with this because if your class does not have a default constructor you will get an exception. In this case you can either define a default constructor to that class or simply set a value for that property before calling the map function to avoid this exception.
+- Class type - Activator.CreateInstance will be called for destination's property type. It uses the default class constructor to create a new object of that class. If your class does not have a default constructor a MapperException will be thrown saying that your Class does not have a default constructor. In this case you can either define a default constructor to that class or simply set a value for that property before calling the map function to avoid this exception.
 - Interface type - An object will be created with all the properties that your interface contains and all the properties it may inherit. For this to work make sure your interface is public. If that interface inherits a property with a name already included on your source interface, the inherited one will be ignored.
 - A type that is assignable from IEnumerable - Your property's value will be set to an empty array of the underlying IEnumerable type and then the map function will be called to map the items from  the source collection to this empty array.
 - Value Types (Primitive types, Guid, DateTime) - The source property's value will be set as destination's property value.
 - String - a copy of the string that is the source property value will be created and set to destination property so that we don't pass the source property value's reference.
-- Record types - A new record is formed by utilizing the source properties as constructor parameters for the destination record type.The constructor that is going to be used is the one with the fewest parameters. However, it's crucial to note that if the source lacks any properties necessary to create an instance of the destination record, an exception will be thrown.
+- Record types - A new record is formed by utilizing the source properties as constructor parameters for the destination record type. The constructor that will be invoked is the one with the fewest parameters. If there are multiple constructors for the type with the same amount of parameters, the first one found will be used. However if that the source lacks any properties necessary to create an instance of the destination record using this constructor, recursivly the next one with the least parameters will be used if the source has all the required properties to invoke that one with. If the instance cannot be created using any of the destination types constructors, a MapperException will be thrown saying that the instance of the specified type cannot be created. 
 
 Types mentioned above are currently the types this mapper can work with.
 
@@ -142,7 +142,6 @@ Assert.That(drawingSource.Author.FirstName, Is.EqualTo(drawingDestination.Author
 Assert.That(drawingSource.Author.LastName, Is.EqualTo(drawingDestination.Author.LastName));
 Assert.That(drawingSource.Id, Is.EqualTo(drawingDestination.Id));
 ```
-The tests have been executed successfully.
 
 ##### Cyclic Data Structures
 
@@ -170,9 +169,9 @@ sourceObject = {
 
 In this scenario, the source properties are nested within each other up to five levels. When mapping this source object to a destination, the default max depth setting of 50 comes into play. Lets say it is actually set to 5 instead of 50. The mapper will traverse through the properties and map them to the destination object until it reaches the fifth level, i.e., sourceProperty5. At this point, the mapper will halt its mapping process to avoid exceeding the defined depth limit. As a result, the properties nested beyond this level will not be mapped further.
 
-However, there might be cases where you need the mapper to delve deeper into the structure than the default depth. This could arise if you have a specific use case that demands a deeper mapping hierarchy. To cater to such situations, the default max depth setting can be overridden within your configuration. By setting a custom max depth value, you can instruct the mapper to traverse more layers of nested properties during the mapping process, accommodating your unique requirements.
+However, there might be cases where you need the mapper to delve deeper into the structure than the default depth. This could arise if you have a specific use case that demands a deeper mapping hierarchy. To handle these situations, you can change the default maximum depth setting in your configuration. By setting a custom max depth value, you can instruct the mapper to traverse more layers of nested properties during the mapping process, accommodating your unique requirements.
 
-In essence, the default max depth setting serves as a protective measure to prevent infinite mapping loops in cyclic data structures. It helps strike a balance between comprehensive mapping and safeguarding against potential stack overflow exceptions, all while offering the flexibility to tailor the depth limit based on your mapping needs.
+In essence, the default max depth setting serves as a protective measure to prevent infinite mapping loops in cyclic data structures. It helps find the right balance between mapping everything and preventing problems, like the program running into stack overflow exceptions.
 
 ## Configuration setup
 
@@ -244,14 +243,12 @@ public class TestConfiguration : Configuration.Configuration
 
 #### Movitation and Automapper comparison
 
-This project revolves around the central concept of reflection, driven by my personal quest for deeper understanding and knowledge in the field. Delving into the world of reflection was a deliberate choice, inspired by the desire to explore its inner workings and capabilities. The tool that emerged from this endeavor was born from the inspiration provided by AutoMapper, sparking the idea of crafting a bespoke solution catering to similar needs.
+This project is mostly about reflection, I wanted to gain a deeper understanding and knowledge in the field. I chose to explore reflection because I wanted to dig into how it works and what it can do. The tool I developed in this process was inspired by AutoMapper and is designed to meet similar needs.
 
-This tool finds its purpose particularly in the realms of web development and projects employing the "onion-layer" architecture. By seamlessly bridging the gap between entity, domain, and REST models, it becomes an indispensable asset in mapping data across different layers of a software system.
+This tool is particularly useful in web development and projects that use an "onion-layer" architecture. It helps smoothly connect different parts of a software system, making it easier to move data between entity, domain, and REST models. It's like a handy tool for mapping data in your software system.
 The main difference between this tool and AutoMapper is that AutoMapper uses Expressions which are a combination of operands (variables, literals, method calls) and operators that can be evaluated to a single value. With AutoMapper you have the advantage to set a more complex configuration between the types then with this Mapper, but it also has flaws, especially when no mapping configuration is defined, sometimes it works very randomly. When you do not have a configuration set, sometimes it throws an exception
 ![AutoMapperConfigException](https://github.com/aromic1/Mapper/assets/138440619/a2e5174b-7ea0-4c7c-9fa0-8699bbd76db7)
 
 , but sometimes it works even without setting the configuration. 
 
 This tool works more intuitively than AutoMapper by default. The goal of this project was to make a mapper that can map the objects in the simplest way possible, you just need to define your source and it's type along with destination and destination type and the mapper will do the mapping for you. It iterates trought the destination properties and sets the values from the source to the properties that are common following the rules mentioned in the previous paragraph. You don't need to set any configuration at all if you don't need it for a specific reason. On the other hand, if you do need it, there are a few ways in which you can alter the mapper behavior, all mentioned in the "Configuration setup" paragraph.
-
-In essence, this project stands as a testament to the exploration of reflection and its practical applications, empowered by the lessons learned from established tools like AutoMapper.

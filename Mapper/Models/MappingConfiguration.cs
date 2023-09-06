@@ -10,7 +10,7 @@ namespace Models
 
         public Action<TSource, TDestination> BeforeMap { get; private set; }
 
-        public IEnumerable<string> IgnoreProperties { get; private set; }
+        public List<string> IgnoreProperties { get; private set; }
 
         public Action<TSource,TDestination> AfterMap { get; private set; }
 
@@ -22,13 +22,21 @@ namespace Models
 
         public IMappingConfiguration<TSource, TDestination> Ignore(string propertyToIgnore)
         {
-            this.IgnoreProperties = this.IgnoreProperties?.Any() == true ? this.IgnoreProperties.Append(propertyToIgnore) : new[] { propertyToIgnore };
+            if(this.IgnoreProperties == null)
+            {
+                this.IgnoreProperties = new List<string>();
+            }
+            this.IgnoreProperties.Add(propertyToIgnore);
             return this;
         }
 
         public IMappingConfiguration<TSource, TDestination> IgnoreMany(IEnumerable<string> propertiesToIgnore)
         {
-            this.IgnoreProperties = this.IgnoreProperties?.Any() == true ? this.IgnoreProperties.Concat(propertiesToIgnore) : propertiesToIgnore;
+            if (this.IgnoreProperties == null)
+            {
+                this.IgnoreProperties = new List<string>();
+            }
+            this.IgnoreProperties.AddRange(propertiesToIgnore);
             return this;
         }
 

@@ -8,11 +8,9 @@ namespace Configuration
     {
         #region Fields
 
-        public Dictionary<(Type, Type), object> DefinedMappingConfiurations { get; private set; }
+        public Dictionary<(Type, Type), object> DefinedMappingConfigurations { get; private set; }
 
         #endregion Fields
-
-
 
         #region Methods
 
@@ -20,16 +18,16 @@ namespace Configuration
         {
             Type sourceType = typeof(TSource);
             Type destinationType = typeof(TDestination);
-            if (DefinedMappingConfiurations == null)
+            if (DefinedMappingConfigurations == null)
             {
-                DefinedMappingConfiurations = new Dictionary<(Type, Type), object>();
+                DefinedMappingConfigurations = new Dictionary<(Type, Type), object>();
             }
-            else if (DefinedMappingConfiurations.ContainsKey((sourceType, destinationType)) == true)
+            else if (DefinedMappingConfigurations.ContainsKey((sourceType, destinationType)))
             {
-                DefinedMappingConfiurations.Remove((sourceType, destinationType));
+                DefinedMappingConfigurations.Remove((sourceType, destinationType));
             }
             var mappingConfiguration = new MappingConfiguration<TSource, TDestination>();
-            DefinedMappingConfiurations.Add((sourceType, destinationType), mappingConfiguration);
+            DefinedMappingConfigurations.Add((sourceType, destinationType), mappingConfiguration);
             return mappingConfiguration;
         }
 

@@ -54,7 +54,30 @@ namespace UnitTests
             public bool IsGeometryShape { get; private set; }
         }
 
-        public record AuthorRest(string FirstName, string LastName) { }
+        public record Author
+        {
+            public string FirstName { get; init; }
+            public string LastName { get; init; }
+            public int Age { get; init; }
+
+            public Author() { }
+
+            // Constructor with only first name and last name
+            public Author(string FirstName, string LastName)
+            {
+                FirstName = FirstName;
+                LastName = LastName;
+                Age = 0; // Default age
+            }
+
+            // Constructor with all properties
+            public Author(string FirstName, string LastName, int age)
+            {
+                FirstName = FirstName;
+                LastName = LastName;
+                Age = age;
+            }
+        }
 
         public class DrawingRest
         {
@@ -133,7 +156,7 @@ namespace UnitTests
             public IDrawing Parent { get; set; }
         }
 
-        public record Author(string FirstName, string LastName) { }
+        public record AuthorRest(string FirstName, string LastName) { }
 
         public interface IDrawing : IDrawingToInherit
         {

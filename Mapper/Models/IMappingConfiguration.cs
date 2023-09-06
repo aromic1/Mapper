@@ -7,12 +7,26 @@ namespace Models
     {
         #region Properties
 
+        /// <summary>
+        /// The action that will be invoked before the mapping process starts
+        /// </summary>
         Action<TSource, TDestination> BeforeMap { get; }
 
+        /// <summary>
+        /// The action that will be invoked after the mapping process is finished
+        /// </summary>
         Action<TSource,TDestination> AfterMap { get; }
 
-        IEnumerable<string> IgnoreProperties { get; }
+        /// <summary>
+        /// Properties with these names will be ignored during the mapping process, meaning that their 
+        /// value will stay the same on the destination as it was before calling the map function.
+        /// </summary>
+        List<string> IgnoreProperties { get; }
 
+        /// <summary>
+        /// The mapper will traverse through the properties and map them to the destination object until it reaches this level.
+        /// The mapper will halt its mapping process to avoid exceeding the defined depth limit. As a result, the properties nested beyond this level will not be mapped further.
+        /// </summary>
         int? MaxDepth { get; }
 
         #endregion Properties

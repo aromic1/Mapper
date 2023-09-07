@@ -145,9 +145,10 @@ Assert.That(drawingSource.Id, Is.EqualTo(drawingDestination.Id));
 
 ##### Cyclic Data Structures
 
-In the context of the mapping process, cyclic data structures refer to scenarios where an object's properties create a loop, ultimately leading back to the original object. This intricate structure can cause issues, particularly stack overflow exceptions, when trying to map these objects due to the recursive nature of the mapping process. To mitigate this concern, a safeguard mechanism has been implemented, and this safeguard is what we refer to as the "max depth setting."
+In the context of the mapping process, cyclic data structures refer to scenarios where an object's properties create a loop, ultimately leading back to the original object. This intricate structure can cause issues, particularly stack overflow exceptions, when trying to map these objects due to the recursive nature of the mapping process. To mitigate this concern, a safeguard mechanism has been implemented. Mapper keeps track of references to previously mapped objects during a single mapping process. So, if the same source object reappears, the reference of the destination object to which the source one needs to be mapped will be set to the reference of the destination object that Mapper has already handled. This prevents redundant mapping and resolves the issue of cyclic dependencies in the mapping process. This kind of logic also serves to follow the reference linking pattern from the source and transfer the same pattern to the destination
 
-By default, the max depth setting is set to 50, representing a limit on the number of nested levels the mapper will traverse during the mapping process. This is done to prevent infinite loops and the associated stack overflow exceptions. Let's delve into an example to illustrate this further:
+##### Max Depth Setting
+Additionally, there is a "max depth" setting, set to a default value of 50, which serves to limit the mapping of objects beyond 50 levels of nested properties.
 
 Consider a source object with multiple levels of properties:
 
@@ -170,8 +171,6 @@ sourceObject = {
 In this scenario, the source properties are nested within each other up to five levels. When mapping this source object to a destination, the default max depth setting of 50 comes into play. Lets say it is actually set to 5 instead of 50. The mapper will traverse through the properties and map them to the destination object until it reaches the fifth level, i.e., sourceProperty5. At this point, the mapper will halt its mapping process to avoid exceeding the defined depth limit. As a result, the properties nested beyond this level will not be mapped further.
 
 However, there might be cases where you need the mapper to delve deeper into the structure than the default depth. This could arise if you have a specific use case that demands a deeper mapping hierarchy. To handle these situations, you can change the default maximum depth setting in your configuration. By setting a custom max depth value, you can instruct the mapper to traverse more layers of nested properties during the mapping process, accommodating your unique requirements.
-
-In essence, the default max depth setting serves as a protective measure to prevent infinite mapping loops in cyclic data structures. It helps find the right balance between mapping everything and preventing problems, like the program running into stack overflow exceptions.
 
 ## Configuration setup
 
@@ -252,3 +251,56 @@ The main difference between this tool and AutoMapper is that AutoMapper uses Exp
 , but sometimes it works even without setting the configuration. 
 
 This tool works more intuitively than AutoMapper by default. The goal of this project was to make a mapper that can map the objects in the simplest way possible, you just need to define your source and it's type along with destination and destination type and the mapper will do the mapping for you. It iterates trought the destination properties and sets the values from the source to the properties that are common following the rules mentioned in the previous paragraph. You don't need to set any configuration at all if you don't need it for a specific reason. On the other hand, if you do need it, there are a few ways in which you can alter the mapper behavior, all mentioned in the "Configuration setup" paragraph.
+
+Also, when I tried to do this with using AutoMapper, drawingRest being a class DrawingRest object
+```
+var configAutoMapper = new AutoMapper.MapperConfiguration(cfg =>
+{
+    cfg.CreateMap<DrawingRest, IDrawing>();
+});
+var mapper2 = new AutoMapper.Mapper(configAutoMapper);
+
+mapper2.Map<IDrawing>(drawingRest);
+```
+![AutoMapperIDrawingException](https://github.com/aromic1/Mapper/assets/138440619/93944b3d-fdd1-48a8-8121-0c4e1370b16c)
+
+I got this exception, but when I used this mapper to do the same thing it did not fail. 
+
+When I try to do this using AutoMapper
+```
+public class DrawingRest
+{
+    public DrawingRest(DrawingRest? parent = null)
+    {
+        Parent = parent ?? this;
+    }
+
+    public DrawingRest Parent { get; set; }
+}
+
+public class Drawing
+{
+    public Drawing(Drawing? parent = null)
+    {
+        Parent = parent ?? this;
+    }
+
+    public Drawing Parent { get; set; }
+}
+
+[Test]
+public void AutoMapperStackOverflowExample()
+{
+    var configAutoMapper = new AutoMapper.MapperConfiguration(cfg =>
+    {
+        cfg.CreateMap<DrawingRest, Drawing>();
+    });
+    var mapper2 = new AutoMapper.Mapper(configAutoMapper);
+
+    var drawingRest = new DrawingRest();
+    var newDrawing = mapper2.Map<Drawing>(drawingRest);
+}
+```
+I get the following Stack overflow exception "The active test run was aborted. Reason: Test host process crashed : Stack overflow. at System.Collections.Concurrent.ConcurrentDictionary`2[[AutoMapper.Internal.MapRequest, AutoMapper, Version=12.0.0.0, Culture=neutral, PublicKeyToken=be96cd2c38ef1005]...". Something like that would not occur when using this Mapper, the reson why is explained in the Cyclic Data Structures paragraph.
+   
+I'm not trying to say that this tool is better than AutoMapper overall, but there are certainly cases where it works better, like these exemples above.

@@ -301,6 +301,6 @@ public void AutoMapperStackOverflowExample()
     var newDrawing = mapper2.Map<Drawing>(drawingRest);
 }
 ```
-I get the following Stack overflow exception "The active test run was aborted. Reason: Test host process crashed : Stack overflow. at System.Collections.Concurrent.ConcurrentDictionary`2[[AutoMapper.Internal.MapRequest, AutoMapper, Version=12.0.0.0, Culture=neutral, PublicKeyToken=be96cd2c38ef1005]...". Something like that would not occur when using this Mapper, the reson why is explained in the Cyclic Data Structures paragraph.
+I get the following Stack overflow exception "The active test run was aborted. Reason: Test host process crashed : Stack overflow. at System.Collections.Concurrent.ConcurrentDictionary`2[[AutoMapper.Internal.MapRequest, AutoMapper, Version=12.0.0.0, Culture=neutral, PublicKeyToken=be96cd2c38ef1005]...". Something like that would not occur when using this Mapper, the reason why is explained in the Cyclic Data Structures paragraph.
    
 I'm not trying to say that this tool is better than AutoMapper overall, but there are certainly cases where it works better, like these exemples above.

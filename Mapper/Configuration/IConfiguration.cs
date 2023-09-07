@@ -6,7 +6,7 @@ namespace Configuration
 {
     public interface IConfiguration
     {
-        Dictionary<(Type, Type), object> DefinedMappingConfiurations { get; }
+        Dictionary<(Type, Type), IMappingConfiguration> DefinedMappingConfiurations { get; }
 
         IMappingConfiguration<TSource, TDestination> CreateMap<TSource, TDestination>();
     }

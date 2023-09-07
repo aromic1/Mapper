@@ -8,11 +8,13 @@ namespace Models
     {
         #region Properties
 
-        public Action<TSource, TDestination> BeforeMap { get; private set; }
+        //public Action<TSource, TDestination> BeforeMap { get; private set; }
+        public object BeforeMap { get; private set; }
 
         public IEnumerable<string> IgnoreProperties { get; private set; }
 
-        public Action<TSource,TDestination> AfterMap { get; private set; }
+        //public Action<TSource,TDestination> AfterMap { get; private set; }
+        public object AfterMap { get; private set; }
 
         public int? MaxDepth { get; private set; }
 

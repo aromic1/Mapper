@@ -3,17 +3,28 @@ using System.Collections.Generic;
 
 namespace Models
 {
-    public interface IMappingConfiguration<TSource, TDestination>
+    public interface IMappingConfiguration
     {
-        #region Properties
+        object BeforeMap { get; }
 
-        Action<TSource, TDestination> BeforeMap { get; }
-
-        Action<TSource,TDestination> AfterMap { get; }
+        object AfterMap { get; }
 
         IEnumerable<string> IgnoreProperties { get; }
 
         int? MaxDepth { get; }
+    }
+
+    public interface IMappingConfiguration<TSource, TDestination> : IMappingConfiguration
+    {
+        #region Properties
+
+        //Action<TSource, TDestination> BeforeMap { get; }
+
+        //Action<TSource,TDestination> AfterMap { get; }
+
+        //IEnumerable<string> IgnoreProperties { get; }
+
+        //int? MaxDepth { get; }
 
         #endregion Properties
 

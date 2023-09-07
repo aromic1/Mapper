@@ -32,18 +32,6 @@ namespace Models
 
     public interface IMappingConfiguration<TSource, TDestination> : IMappingConfiguration
     {
-        #region Properties
-
-        //Action<TSource, TDestination> BeforeMap { get; }
-
-        //Action<TSource,TDestination> AfterMap { get; }
-
-        //IEnumerable<string> IgnoreProperties { get; }
-
-        //int? MaxDepth { get; }
-
-        #endregion Properties
-
         #region Methods
 
 

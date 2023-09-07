@@ -6,7 +6,7 @@ namespace Configuration
 {
     public interface IConfiguration
     {
-        Dictionary<(Type, Type), object> DefinedMappingConfigurations { get; }
+        Dictionary<(Type, Type), IMappingConfiguration> DefinedMappingConfiurations { get; }
 
         /// <summary>
         /// Creates the default mapping configuration between TSource and TDestination types.

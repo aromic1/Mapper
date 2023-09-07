@@ -3,6 +3,7 @@ using Models;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -18,7 +19,7 @@ namespace Mappings
 
         private Dictionary<Type, Type> TypesFromInterfaces = new Dictionary<Type, Type>();
 
-        private Dictionary<(Type, Type), object> DefinedMappingConfigurations { get; set; }
+        private Dictionary<(Type, Type), IMappingConfiguration> DefinedMappingConfiurations { get; set; }
 
         #endregion Fields
 
@@ -26,24 +27,24 @@ namespace Mappings
 
         public Mapper()
         {
-            DefinedMappingConfigurations = new Dictionary<(Type, Type), object>();
+            DefinedMappingConfiurations = new Dictionary<(Type, Type), IMappingConfiguration>();
         }
 
         public Mapper(IConfiguration mappingConfiguration)
         {
-            if(mappingConfiguration.DefinedMappingConfigurations != null)
+            if (mappingConfiguration.DefinedMappingConfiurations != null)
             {
                 DefinedMappingConfigurations = mappingConfiguration.DefinedMappingConfigurations;
             }
             else
             {
-                DefinedMappingConfigurations = new Dictionary<(Type, Type), object>();
+                DefinedMappingConfiurations = new Dictionary<(Type, Type), IMappingConfiguration>();
             }
         }
 
         public Mapper(IEnumerable<IConfiguration> mappingConfigurations)
         {
-            DefinedMappingConfigurations = new Dictionary<(Type, Type), object>();
+            DefinedMappingConfiurations = new Dictionary<(Type, Type), IMappingConfiguration>();
             foreach (var mappingConfiguration in mappingConfigurations)
             {
                 if (mappingConfiguration.DefinedMappingConfigurations != null)
@@ -55,7 +56,8 @@ namespace Mappings
 
         #endregion Constructors
 
-        private TDestination MapCore<TSource, TDestination>(TSource source, TDestination destination, dynamic mappingConfiguration, Dictionary<object, object> alreadyMappedObjects, int maxDepth, int currentDepth = 0)
+        //private TDestination MapCore<TSource, TDestination>(TSource source, TDestination destination, IMappingConfiguration<TSource, TDestination> mappingConfiguration, Dictionary<object, object> alreadyMappedObjects, int maxDepth, int currentDepth = 0)
+        private object MapCore(object source, object destination, IMappingConfiguration mappingConfiguration, int maxDepth, int currentDepth = 0, Type tDestination = null)
         {
             if(alreadyMappedObjects == null)
             {
@@ -77,12 +79,21 @@ namespace Mappings
             {
                 return destination;
             }
-            ((Action<TSource,TDestination>)mappingConfiguration?.BeforeMap)?.Invoke(source, destination);
-            Type destinationType = destination?.GetType() ?? typeof(TDestination);
+            //((Action<TSource, TDestination>)mappingConfiguration?.BeforeMap)?.Invoke(source, destination);
+            //((Action<TSource, TDestination>)mappingConfiguration?.BeforeMap)?.Invoke(source, destination);
+            var beforeMapInvoke = mappingConfiguration?.BeforeMap?.GetType().GetMethod("Invoke");
+            if (beforeMapInvoke != null)
+            {
+                beforeMapInvoke.Invoke(mappingConfiguration.BeforeMap, new object[] { source, destination });
+            }
+
+            //Type destinationType = destination?.GetType() ?? typeof(TDestination);
+            Type destinationType = destination?.GetType();
             if (typeof(IEnumerable).IsAssignableFrom(destinationType) && destinationType != typeof(string))
             {
                 //if destinationType is assignable from IEnumerable, but the sourceType isn't, the mapping should not be possible.
-                Type sourceType = typeof(TSource);
+                //Type sourceType = source?.GetType() ?? typeof(TSource);
+                Type sourceType = source.GetType();
                 if (!typeof(IEnumerable).IsAssignableFrom(sourceType))
                 {
                     throw new MapperException($"Cannot map from {sourceType.Name} to {destinationType.Name}.");
@@ -106,10 +117,10 @@ namespace Mappings
                         var underlyingType = destinationType.IsArray ? destinationType.GetElementType() : destinationType.GetGenericArguments()[0];
                         var sourceItemType = sourceItem.GetType();
                         //get the MapCore method so we can explicitly set source and destination types before making the method call.
-                        var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
-                        var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourceItemType, underlyingType);
+                        //var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
+                        //var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourceItemType, underlyingType);
                         currentDepth--;
-                        var mappedDestination = nonGenericMapMethod.Invoke(this, new[] { sourceItem, destinationItem, mappingConfiguration, alreadyMappedObjects, maxDepth, currentDepth });
+                        var mappedDestination = MapCore(sourceItem, destinationItem, mappingConfiguration, maxDepth, currentDepth, tDestination: tDestination);
                         if (indexOutOfRange)
                         {
                             destinationList.Add(mappedDestination);
@@ -127,32 +138,38 @@ namespace Mappings
                             destinationList.RemoveAt(j);
                         }
                     }
-                    return (TDestination)destinationList;
+                    return destinationList;
                 }
             }
 
-            if (destination == null)
+            if (destination == null && tDestination == null)
             {
-                object newInstance = null;
-                if (typeof(TDestination).GetMethods().Any(x => x.Name == "<Clone>$"))
+                throw new NullReferenceException("destination and TDestination was null.");
+            }
+            if (destination == null)
                 {
-                    newInstance = CreateInstanceOfRecordType(source, typeof(TDestination));
+                //throw new NullReferenceException("destination was null.");
+                dynamic newInstance = null;
+                if (tDestination.GetMethods().Any(x => x.Name == "<Clone>$"))
+                {
+                    newInstance = CreateInstanceOfRecordType(source, tDestination);
                 }
-                if (typeof(TDestination).IsInterface)
+                if (tDestination.IsInterface)
                 {
                     //if our destination is null, we need to create an instance of the destination type. since we cant create an instance of an interface,
                     //we create a new type that implements that interface - has all the properties as our destination type and then create an object of that type.
-                    destinationType = CreateClassTypeFromInterface(typeof(TDestination));
+                    destinationType = CreateClassTypeFromInterface(tDestination);
                 }
                 else
                 {
-                    destinationType = typeof(TDestination);
+                    destinationType = tDestination;
                 }
                 try
                 {
-                    newInstance = Activator.CreateInstance(destinationType);
-                    var newDestination = (TDestination)newInstance;
-                    destination = newDestination;
+                    //newInstance = Activator.CreateInstance(destinationType);
+                    //var newDestination = (TDestination)newInstance;
+                    //destination = newDestination;
+                    destination = Activator.CreateInstance(destinationType);
                 }
                 catch (Exception ex)
                 {
@@ -160,14 +177,15 @@ namespace Mappings
                     exceptionToThrow.Append(". Define a parametarless constructor or set this property to be ignored.");
                     throw new MapperException(exceptionToThrow.ToString());
                 }
-                TDestination mappedDestination;
-                if (DefinedMappingConfigurations.TryGetValue((typeof(TSource), typeof(TDestination)), out var mappingConf))
+                object mappedDestination;
+                if (DefinedMappingConfiurations.TryGetValue((source.GetType(), tDestination), out var mappingConf))
                 {
-                    mappedDestination = MapCore(source, destination, mappingConf,null, maxDepth, currentDepth);
+                    //var _mappingConfiguration = (IMappingConfiguration<TSource, TDestination>)mappingConfiguration;
+                    mappedDestination = MapCore(source, destination, mappingConf, maxDepth, currentDepth, tDestination: tDestination);
                 }
                 else
                 {
-                    mappedDestination = MapCore(source, destination, null,null, maxDepth, currentDepth);
+                    mappedDestination = MapCore(source, destination, null, maxDepth, currentDepth, tDestination: tDestination);
                 }
                 destination = mappedDestination;
                 return mappedDestination;
@@ -175,9 +193,14 @@ namespace Mappings
             //get destination properties that are not ignored within configuration and map the values from source properties with the same name
             //filter out the ones that are set to be ignored if there are any
             var ignoreProperties = mappingConfiguration?.IgnoreProperties == null ? null : (IEnumerable<string>)mappingConfiguration.IgnoreProperties;
-            var properties = destinationType.GetProperties().Where(x => ignoreProperties?.Any(ip => ip == x.Name) != true);
-            PropertyMap(source, destination, properties, alreadyMappedObjects, maxDepth, currentDepth);
-            mappingConfiguration?.AfterMap?.Invoke(source, destination);
+            var properties = destination.GetType().GetProperties().Where(x => x.CanWrite && ignoreProperties?.Any(ip => ip == x.Name) != true);
+            PropertyMap(source, destination, properties, maxDepth, currentDepth);
+            //mappingConfiguration?.AfterMap?.Invoke(source, destination);
+            var afterMapInvoke = mappingConfiguration?.AfterMap?.GetType().GetMethod("Invoke");
+            if (afterMapInvoke != null)
+            {
+                afterMapInvoke.Invoke(mappingConfiguration.AfterMap, new object[] { source, destination });
+            }
             return destination;
         }
 
@@ -191,39 +214,45 @@ namespace Mappings
             {
                 throw new MapperException("Destination value cannot be null");
             }
-            if (DefinedMappingConfigurations.TryGetValue((typeof(TSource), typeof(TDestination)), out var mappingConfiguration))
+            if (DefinedMappingConfiurations.TryGetValue((typeof(TSource), typeof(TDestination)), out IMappingConfiguration mappingConfiguration))
             {
-                MapCore(source, destination, mappingConfiguration,null, ((IMappingConfiguration<TSource,TDestination>)mappingConfiguration)?.MaxDepth ?? defaultMaxDepth);
+                var _mappingConfiguration = (IMappingConfiguration<TSource, TDestination>)mappingConfiguration;
+                MapCore(source, destination, _mappingConfiguration, _mappingConfiguration?.MaxDepth ?? defaultMaxDepth, tDestination: typeof(TDestination));
             }
             else
             {
-                MapCore(source, destination, null,null, defaultMaxDepth);
+                MapCore(source, destination, null, defaultMaxDepth, tDestination: typeof(TDestination));
             }
         }
 
         public IEnumerable<TDestination> Map<TSource, TDestination>(IEnumerable<TSource> source)
         {
-            if (source == null)
+            foreach (var item in source)
             {
-                throw new MapperException("Source value cannot be null.");
+                yield return Map<TSource, TDestination>(item);
             }
-            var addedDepths = new List<MaxDepthAddedAt>();
-            IEnumerable<TDestination> destinationValue = (IEnumerable<TDestination>)Array.CreateInstance(typeof(TDestination), source.Count());
-            if (source?.Any(x => x != null) != true)
-            {
-                return destinationValue;
-            }
-            IEnumerable<TDestination> mappedDestination;
-            if (DefinedMappingConfigurations.TryGetValue((typeof(TSource), typeof(TDestination)), out dynamic mappingConfiguration))
-            {
-                mappedDestination = MapCore(source, destinationValue, mappingConfiguration, null, mappingConfiguration?.MaxDepth ?? defaultMaxDepth);
-            }
-            else
-            {
-                mappedDestination = MapCore(source, destinationValue,null, null, defaultMaxDepth);
-            }
-            destinationValue = mappedDestination;
-            return destinationValue;
+            //if (source == null)
+            //{
+            //    throw new MapperException("Source value cannot be null.");
+            //}
+            //var addedDepths = new List<MaxDepthAddedAt>();
+            //IEnumerable<TDestination> destinationValue = (IEnumerable<TDestination>)Array.CreateInstance(typeof(TDestination), source.Count());
+            //if (source?.Any(x => x != null) != true)
+            //{
+            //    return destinationValue;
+            //}
+            //IEnumerable<TDestination> mappedDestination;
+            //if (DefinedMappingConfiurations.TryGetValue((typeof(TSource), typeof(TDestination)), out object mappingConfiguration))
+            //{
+            //    var _mappingConfiguration = (IMappingConfiguration<TSource, TDestination>)mappingConfiguration;
+            //    mappedDestination = MapCore<TSource, TDestination>(source, destinationValue, _mappingConfiguration, _mappingConfiguration?.MaxDepth ?? defaultMaxDepth);
+            //}
+            //else
+            //{
+            //    mappedDestination = MapCore(source, destinationValue, null, defaultMaxDepth);
+            //}
+            //destinationValue = mappedDestination;
+            //return destinationValue;
         }
 
         public TDestination Map<TSource, TDestination>(TSource source)
@@ -260,7 +289,7 @@ namespace Mappings
                 throw new MapperException(exceptionToThrow.ToString());
             }
             TDestination destination = (TDestination)newInstance;
-            if (DefinedMappingConfigurations.TryGetValue((source.GetType(), typeof(TDestination)), out dynamic mappingConfiguration))
+            if (DefinedMappingConfiurations.TryGetValue((source.GetType(), typeof(TDestination)), out IMappingConfiguration mappingConfiguration))
             {
                 MapCore(source, destination, mappingConfiguration,null, mappingConfiguration?.MaxDepth ?? defaultMaxDepth);
             }
@@ -323,8 +352,8 @@ namespace Mappings
                         if (constructors.Length > 0)
                         {
                             destinationValue = CreateInstanceOfRecordType(sourceValue, propertyType);
-                            object mappedDestination;
-                            if (DefinedMappingConfigurations.TryGetValue((sourcePropertyType, propertyType), out var mappingConfiguration))
+                            dynamic mappedDestination;
+                            if (DefinedMappingConfiurations.TryGetValue((sourcePropertyType, propertyType), out IMappingConfiguration mappingConfiguration))
                             {
                                 mappedDestination = MapCore(sourceValue, destinationValue, mappingConfiguration, alreadyMappedObjects, maxDepth, currentDepth);
                             }
@@ -356,15 +385,16 @@ namespace Mappings
                             }
                         }
                         //again creating a new instance of the property class type, explicitly setting source and destination types for the mapcore function to map
-                        var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
-                        var nonGenericMapMethod = mapMethod.MakeGenericMethod(propertyType, sourcePropertyType);
-                        if (DefinedMappingConfigurations.TryGetValue((sourcePropertyType, propertyType), out var mappingConfiguration))
+                        //var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
+                        //var nonGenericMapMethod = mapMethod.MakeGenericMethod(propertyType, sourcePropertyType);
+                        if (DefinedMappingConfiurations.TryGetValue((sourcePropertyType, propertyType), out IMappingConfiguration mappingConfiguration))
                         {
-                            nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, mappingConfiguration, alreadyMappedObjects, maxDepth, currentDepth });
+                            MapCore(sourceValue, destinationValue, mappingConfiguration, maxDepth, currentDepth, tDestination: propertyType);
                         }
                         else
                         {
-                            nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, null, alreadyMappedObjects, maxDepth, currentDepth });
+                            MapCore(sourceValue, destinationValue, null, maxDepth, currentDepth, tDestination: propertyType);
+                            //nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, null, maxDepth, currentDepth });
                         }
                         //MapCore(sourceValue, destinationValue, mappingConfiguration, currentDepth);
                         property.SetValue(destination, destinationValue);
@@ -381,17 +411,18 @@ namespace Mappings
                             //get underlying source type so we can create an empty array of that type so we can then map it from sourceValue
                             destinationValue = Array.CreateInstance(underlyingDestinationType, ((IEnumerable<object>)sourceValue)?.Count() ?? 0);
                         }
-                        var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
-                        var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourcePropertyType, propertyType);
+                        //var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
+                        //var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourcePropertyType, propertyType);
                         object mappedDestination;
                         var sourceUnderlyingValue = sourcePropertyType.GetElementType() ?? sourcePropertyType.GetGenericArguments()[0];
-                        if (DefinedMappingConfigurations.TryGetValue((sourceUnderlyingValue, underlyingDestinationType), out var mappingConfiguration))
+                        if (DefinedMappingConfiurations.TryGetValue((sourceUnderlyingValue, underlyingDestinationType), out IMappingConfiguration mappingConfiguration))
                         {
-                            mappedDestination = nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, mappingConfiguration, alreadyMappedObjects, maxDepth, currentDepth });
+                            //mappedDestination = nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, mappingConfiguration, maxDepth, currentDepth });
+                            mappedDestination = MapCore(sourceValue, destinationValue, mappingConfiguration, maxDepth, currentDepth, tDestination: underlyingDestinationType);
                         }
                         else
                         {
-                            mappedDestination = nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, null, alreadyMappedObjects, maxDepth, currentDepth });
+                            mappedDestination = MapCore(sourceValue, destinationValue, null, maxDepth, currentDepth, tDestination: underlyingDestinationType);
                         }
                         property.SetValue(destination, mappedDestination);
                     }
@@ -407,15 +438,17 @@ namespace Mappings
                             }
                             destinationValue = Activator.CreateInstance(CreateClassTypeFromInterface(propertyType));
                         }
-                        var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
-                        var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourcePropertyType, propertyType);
-                        if (DefinedMappingConfigurations.TryGetValue((sourcePropertyType, propertyType), out var mappingConfiguration))
+                        //var mapMethod = typeof(Mapper).GetMethod("MapCore", BindingFlags.NonPublic | BindingFlags.Instance);
+                        //var nonGenericMapMethod = mapMethod.MakeGenericMethod(sourcePropertyType, propertyType);
+                        if (DefinedMappingConfiurations.TryGetValue((sourcePropertyType, propertyType), out IMappingConfiguration mappingConfiguration))
                         {
-                            nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, mappingConfiguration, alreadyMappedObjects, maxDepth, currentDepth });
+                            //nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, mappingConfiguration, maxDepth, currentDepth });
+                            MapCore(sourceValue, destinationValue, mappingConfiguration, maxDepth, currentDepth, tDestination: propertyType);
                         }
                         else
                         {
-                            nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, null, alreadyMappedObjects, maxDepth, currentDepth });
+                            MapCore(sourceValue, destinationValue, null, maxDepth, currentDepth, tDestination: propertyType);
+                            //nonGenericMapMethod.Invoke(this, new[] { sourceValue, destinationValue, null, maxDepth, currentDepth });
                         }
                         property.SetValue(destination, destinationValue);
                     }

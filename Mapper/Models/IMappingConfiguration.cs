@@ -3,19 +3,19 @@ using System.Collections.Generic;
 
 namespace Models
 {
-    public interface IMappingConfiguration<TSource, TDestination>
+    public interface IMappingConfiguration
     {
-        #region Properties
-
-        /// <summary>
-        /// The action that will be invoked before the mapping process starts
+    
+    	/// <summary>
+        /// Properties with these names will be ignored during the mapping process, meaning that their 
+        /// value will stay the same on the destination as it was before calling the map function.
         /// </summary>
-        Action<TSource, TDestination> BeforeMap { get; }
-
-        /// <summary>
+        object BeforeMap { get; }
+        
+		/// <summary>
         /// The action that will be invoked after the mapping process is finished
         /// </summary>
-        Action<TSource,TDestination> AfterMap { get; }
+        object AfterMap { get; }
 
         /// <summary>
         /// Properties with these names will be ignored during the mapping process, meaning that their 
@@ -28,6 +28,19 @@ namespace Models
         /// The mapper will halt its mapping process to avoid exceeding the defined depth limit. As a result, the properties nested beyond this level will not be mapped further.
         /// </summary>
         int? MaxDepth { get; }
+    }
+
+    public interface IMappingConfiguration<TSource, TDestination> : IMappingConfiguration
+    {
+        #region Properties
+
+        //Action<TSource, TDestination> BeforeMap { get; }
+
+        //Action<TSource,TDestination> AfterMap { get; }
+
+        //IEnumerable<string> IgnoreProperties { get; }
+
+        //int? MaxDepth { get; }
 
         #endregion Properties
 

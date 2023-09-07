@@ -8,7 +8,7 @@ namespace Configuration
     {
         #region Fields
 
-        public Dictionary<(Type, Type), object> DefinedMappingConfigurations { get; private set; }
+        public Dictionary<(Type, Type), IMappingConfiguration> DefinedMappingConfiurations { get; private set; }
 
         #endregion Fields
 
@@ -20,7 +20,7 @@ namespace Configuration
             Type destinationType = typeof(TDestination);
             if (DefinedMappingConfigurations == null)
             {
-                DefinedMappingConfigurations = new Dictionary<(Type, Type), object>();
+                DefinedMappingConfiurations = new Dictionary<(Type, Type), IMappingConfiguration>();
             }
             else if (DefinedMappingConfigurations.ContainsKey((sourceType, destinationType)))
             {

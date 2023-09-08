@@ -74,11 +74,12 @@ namespace Mappings
                 beforeMapInvoke.Invoke(mappingConfiguration.BeforeMap, new object[] { source, destination });
             }
 
-            Type destinationType = destination?.GetType();
+            Type destinationType = tDestination ?? destination?.GetType();
+            Type sourceType = source.GetType();
+
             if (typeof(IEnumerable).IsAssignableFrom(destinationType) && destinationType != typeof(string))
             {
                 //if destinationType is assignable from IEnumerable, but the sourceType isn't, the mapping should not be possible.
-                Type sourceType = source.GetType();
                 if (!typeof(IEnumerable).IsAssignableFrom(sourceType))
                 {
                     throw new MapperException($"Cannot map from {sourceType.Name} to {destinationType.Name}.");
@@ -165,7 +166,7 @@ namespace Mappings
                     throw new MapperException(exceptionToThrow.ToString());
                 }
                 object mappedDestination;
-                if (DefinedMappingConfigurations.TryGetValue((source.GetType(), tDestination), out var mappingConf))
+                if (DefinedMappingConfigurations.TryGetValue((sourceType, tDestination), out var mappingConf))
                 {
                     mappedDestination = MapCore(source, destination, mappingConf, alreadyMappedObjects, maxDepth, currentDepth, tDestination: tDestination);
                 }
@@ -178,7 +179,7 @@ namespace Mappings
             }
             //get destination properties that are not ignored within configuration and map the values from source properties with the same name
             //filter out the ones that are set to be ignored if there are any
-            var properties = destination.GetType().GetProperties().Where(x => x.CanWrite && mappingConfiguration?.IgnoreProperties?.Any(ip => ip == x.Name) != true);
+            var properties = destinationType.GetProperties().Where(x => x.CanWrite && mappingConfiguration?.IgnoreProperties?.Any(ip => ip == x.Name) != true);
             PropertyMap(source, destination, properties, alreadyMappedObjects, maxDepth, currentDepth);
             var afterMapInvoke = mappingConfiguration?.AfterMap?.GetType().GetMethod("Invoke");
             if (afterMapInvoke != null)

@@ -6,7 +6,7 @@ namespace UnitTests
     {
         public interface IA
         {
-            public string Name { get; }
+            public string Name { get; set; }
             //public string Tag { get; }
         }
 

@@ -299,6 +299,14 @@ namespace Mappings
                 {
                     throw new MapperException($"Destination property {property.Name} does not have a set method defined.");
                 }
+                try
+                {
+                    object _destinationValue = property.GetValue(destination);
+                }
+                catch
+                {
+
+                }
                 object destinationValue = property.GetValue(destination);
                 var sourceProperty = source.GetType().GetProperty(property.Name);
                 if (sourceProperty == null || !sourceProperty.CanRead)

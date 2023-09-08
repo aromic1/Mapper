@@ -5,12 +5,29 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 
 namespace Mappings
 {
+    public static class Extensions
+    {
+        public static TValue GetOrAdd<TKey, TValue>(this Dictionary<TKey, TValue> dictionary, TKey key, Func<TValue> lazyValue)
+        {
+            if (!dictionary.ContainsKey(key))
+            {
+                dictionary[key] = lazyValue();
+            }
+            return dictionary[key];
+        }
+    }
+    static class FastTypeInfo
+    {
+        static Dictionary<Type, bool> isRecordTypeCache = new Dictionary<Type, bool>();
+        public static bool IsRecordType(Type type) => isRecordTypeCache.GetOrAdd(type, () => type.GetMethods().Any(x => x.Name == "<Clone>$"));
+    }
     public class Mapper : IMapper
     {
         #region Fields
@@ -141,7 +158,8 @@ namespace Mappings
             }
             if (destination == null)
             {
-                if (tDestination.GetMethods().Any(x => x.Name == "<Clone>$"))
+                //if (tDestination.GetMethods().Any(x => x.Name == "<Clone>$"))
+                if (FastTypeInfo.IsRecordType(tDestination))
                 {
                     destination = CreateInstanceOfRecordType(source, tDestination);
                 }
@@ -226,7 +244,8 @@ namespace Mappings
             }
             Type destinationType = null;
             object newInstance = null;
-            if (typeof(TDestination).GetMethods().Any(x => x.Name == "<Clone>$"))
+            //if (typeof(TDestination).GetMethods().Any(x => x.Name == "<Clone>$"))
+            if (FastTypeInfo.IsRecordType(typeof(TDestination)))
             {
                 newInstance = CreateInstanceOfRecordType(source, typeof(TDestination));
             }
@@ -310,8 +329,9 @@ namespace Mappings
                     {
                         property.SetValue(destination, sourceValue);
                     }
-                    else if (propertyType.GetMethods().Any(x => x.Name == "<Clone>$"))
-                    {
+                    //else if (propertyType.GetMethods().Any(x => x.Name == "<Clone>$"))
+                    else if (FastTypeInfo.IsRecordType(propertyType))
+                            {
                         ConstructorInfo[] constructors = propertyType.GetConstructors();
                         if (constructors.Length > 0)
                         {
@@ -411,7 +431,8 @@ namespace Mappings
 
         private object CreateInstanceOfRecordType<TSource>(TSource source, Type destinationType)
         {
-            if (!source.GetType().GetMethods().Any(x => x.Name == "<Clone>$"))
+            //if (!source.GetType().GetMethods().Any(x => x.Name == "<Clone>$"))
+            if (!FastTypeInfo.IsRecordType(source.GetType()))
             {
                 throw new MapperException($"Cannot map from non record type to a record type. Mapping {source.GetType().Name} to {destinationType.Name}");
             }
@@ -565,9 +586,11 @@ namespace Mappings
         {
             if (sourcePropertyType != destinationPropertyType)
             {
-                if (destinationPropertyType.GetMethods().Any(x => x.Name == "<Clone>$"))
+                //if (destinationPropertyType.GetMethods().Any(x => x.Name == "<Clone>$"))
+                if (FastTypeInfo.IsRecordType(destinationPropertyType))
                 {
-                    if (!sourcePropertyType.GetMethods().Any(x => x.Name == "<Clone>$"))
+                    //if (!sourcePropertyType.GetMethods().Any(x => x.Name == "<Clone>$"))
+                    if (!FastTypeInfo.IsRecordType(sourcePropertyType))
                     {
                         throw new MapperException($"Cannot map from non record type to a record type. Mapping {sourcePropertyType} to {sourcePropertyType}");
                     }

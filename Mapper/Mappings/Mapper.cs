@@ -23,11 +23,14 @@ namespace Mappings
             return dictionary[key];
         }
     }
-    static class FastTypeInfo
+
+    internal static class FastTypeInfo
     {
-        static Dictionary<Type, bool> isRecordTypeCache = new Dictionary<Type, bool>();
+        private static Dictionary<Type, bool> isRecordTypeCache = new Dictionary<Type, bool>();
+
         public static bool IsRecordType(Type type) => isRecordTypeCache.GetOrAdd(type, () => type.GetMethods().Any(x => x.Name == "<Clone>$"));
     }
+
     public class Mapper : IMapper
     {
         #region Fields
@@ -119,7 +122,7 @@ namespace Mappings
                         var underlyingType = destinationType.IsArray ? destinationType.GetElementType() : destinationType.GetGenericArguments()[0];
                         var sourceItemType = sourceItem.GetType();
                         currentDepth--;
-                        var mappedDestination = MapCore(sourceItem, destinationItem, mappingConfiguration, alreadyMappedObjects, maxDepth, currentDepth, tDestination: tDestination);
+                        var mappedDestination = MapCore(sourceItem, destinationItem, mappingConfiguration, alreadyMappedObjects, maxDepth, currentDepth, underlyingType);
                         if (indexOutOfRange)
                         {
                             destinationList.Add(mappedDestination);
@@ -163,7 +166,7 @@ namespace Mappings
                 {
                     destination = CreateInstanceOfRecordType(source, tDestination);
                 }
-                if (tDestination.IsInterface)
+                else if (tDestination.IsInterface)
                 {
                     //if our destination is null, we need to create an instance of the destination type. since we cant create an instance of an interface,
                     //we create a new type that implements that interface - has all the properties as our destination type and then create an object of that type.
@@ -305,7 +308,6 @@ namespace Mappings
                 }
                 catch
                 {
-
                 }
                 object destinationValue = property.GetValue(destination);
                 var sourceProperty = source.GetType().GetProperty(property.Name);
@@ -339,7 +341,7 @@ namespace Mappings
                     }
                     //else if (propertyType.GetMethods().Any(x => x.Name == "<Clone>$"))
                     else if (FastTypeInfo.IsRecordType(propertyType))
-                            {
+                    {
                         ConstructorInfo[] constructors = propertyType.GetConstructors();
                         if (constructors.Length > 0)
                         {
@@ -399,11 +401,11 @@ namespace Mappings
                         var sourceUnderlyingValue = sourcePropertyType.GetElementType() ?? sourcePropertyType.GetGenericArguments()[0];
                         if (DefinedMappingConfigurations.TryGetValue((sourceUnderlyingValue, underlyingDestinationType), out IMappingConfiguration mappingConfiguration))
                         {
-                            mappedDestination = MapCore(sourceValue, destinationValue, mappingConfiguration, alreadyMappedObjects, maxDepth, currentDepth, underlyingDestinationType);
+                            mappedDestination = MapCore(sourceValue, destinationValue, mappingConfiguration, alreadyMappedObjects, maxDepth, currentDepth, propertyType);
                         }
                         else
                         {
-                            mappedDestination = MapCore(sourceValue, destinationValue, null, alreadyMappedObjects, maxDepth, currentDepth, underlyingDestinationType);
+                            mappedDestination = MapCore(sourceValue, destinationValue, null, alreadyMappedObjects, maxDepth, currentDepth, propertyType);
                         }
                         property.SetValue(destination, mappedDestination);
                     }

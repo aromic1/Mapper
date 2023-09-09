@@ -304,3 +304,8 @@ public void AutoMapperStackOverflowExample()
 I get the following Stack overflow exception "The active test run was aborted. Reason: Test host process crashed : Stack overflow. at System.Collections.Concurrent.ConcurrentDictionary`2[[AutoMapper.Internal.MapRequest, AutoMapper, Version=12.0.0.0, Culture=neutral, PublicKeyToken=be96cd2c38ef1005]...". Something like that would not occur when using this Mapper, the reason why is explained in the Cyclic Data Structures paragraph.
    
 I'm not trying to say that this tool is better than AutoMapper overall, but there are certainly cases where it works better, like these exemples above.
+
+If I were to still work on this project there are a few more things I would implement, mostly regarding the custom configuration.
+- I would add an option to choose which source property you want to map into your destination property. In that case you wouldn't have to have the exact same property names to be mapped, you could just set source property "Name" to be mapped into destination property "FirstName" for example.
+- I would add a conditional map that can be set for a destination property, the conditional map would recieve a boolean and would then map or not map the property depending if it's value is true or false. So if you don't want your property to be ignored always, just in some cases, this conditional map would be used to define that.
+- I would try to optimize the process of mapping types assigned from IEnumerable.

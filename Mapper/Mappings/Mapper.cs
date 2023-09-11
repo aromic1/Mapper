@@ -441,11 +441,6 @@ namespace Mappings
 
         private object CreateInstanceOfRecordType<TSource>(TSource source, Type destinationType)
         {
-            //if (!source.GetType().GetMethods().Any(x => x.Name == "<Clone>$"))
-            if (!FastTypeInfo.IsRecordType(source.GetType()))
-            {
-                throw new MapperException($"Cannot map from non record type to a record type. Mapping {source.GetType().Name} to {destinationType.Name}");
-            }
             var constructors = destinationType.GetConstructors().ToList();
             if (constructors.Count > 0)
             {
@@ -599,11 +594,6 @@ namespace Mappings
                 //if (destinationPropertyType.GetMethods().Any(x => x.Name == "<Clone>$"))
                 if (FastTypeInfo.IsRecordType(destinationPropertyType))
                 {
-                    //if (!sourcePropertyType.GetMethods().Any(x => x.Name == "<Clone>$"))
-                    if (!FastTypeInfo.IsRecordType(sourcePropertyType))
-                    {
-                        throw new MapperException($"Cannot map from non record type to a record type. Mapping {sourcePropertyType} to {sourcePropertyType}");
-                    }
                     return;
                 }
                 if (destinationPropertyType.IsInterface)

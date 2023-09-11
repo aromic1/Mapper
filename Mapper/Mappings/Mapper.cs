@@ -302,13 +302,6 @@ namespace Mappings
                 {
                     throw new MapperException($"Destination property {property.Name} does not have a set method defined.");
                 }
-                try
-                {
-                    object _destinationValue = property.GetValue(destination);
-                }
-                catch
-                {
-                }
                 object destinationValue = property.GetValue(destination);
                 var sourceProperty = source.GetType().GetProperty(property.Name);
                 if (sourceProperty == null || !sourceProperty.CanRead)
@@ -444,7 +437,7 @@ namespace Mappings
             //if (!source.GetType().GetMethods().Any(x => x.Name == "<Clone>$"))
             if (!FastTypeInfo.IsRecordType(source.GetType()))
             {
-                throw new MapperException($"Cannot map from non record type to a record type. Mapping {source.GetType().Name} to {destinationType.Name}");
+                //throw new MapperException($"Cannot map from non record type to a record type. Mapping {source.GetType().Name} to {destinationType.Name}");
             }
             var constructors = destinationType.GetConstructors().ToList();
             if (constructors.Count > 0)

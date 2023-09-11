@@ -24,7 +24,7 @@ namespace UnitTests
             public int Tag { get; set; }
         }
 
-        public record RB(string Name);
+        public record RB(string Name, int Tag);
 
 
         [Test]
@@ -54,6 +54,21 @@ namespace UnitTests
 
         [Test]
         public void RecordTest()
+        {
+            /*
+             * Structure: A -> B -> A
+             */
+            var mapper = new Mapper();
+
+            var rb = new RB("foo", 1);
+            var ra = mapper.Map<RB, RA>(rb);
+
+            Assert.That(ra.Name, Is.EqualTo(rb.Name));
+            Assert.That(ra.GetType(), Is.EqualTo(typeof(RA)));
+        }
+
+        [Test]
+        public void RecordToClassTest()
         {
             /*
              * Structure: A -> B -> A

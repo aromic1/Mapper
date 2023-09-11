@@ -143,11 +143,11 @@ Assert.That(drawingSource.Author.LastName, Is.EqualTo(drawingDestination.Author.
 Assert.That(drawingSource.Id, Is.EqualTo(drawingDestination.Id));
 ```
 
-##### Cyclic Data Structures
+### Cyclic Data Structures
 
 In the context of the mapping process, cyclic data structures refer to scenarios where an object's properties create a loop, ultimately leading back to the original object. This intricate structure can cause issues, particularly stack overflow exceptions, when trying to map these objects due to the recursive nature of the mapping process. To mitigate this concern, a safeguard mechanism has been implemented. Mapper keeps track of references to previously mapped objects during a single mapping process. So, if the same source object reappears, the reference of the destination object to which the source one needs to be mapped will be set to the reference of the destination object that Mapper has already handled. This prevents redundant mapping and resolves the issue of cyclic dependencies in the mapping process. This kind of logic also serves to follow the reference linking pattern from the source and transfer the same pattern to the destination
 
-##### Max Depth Setting
+### Max Depth Setting
 Additionally, there is a "max depth" setting, set to a default value of 50, which serves to limit the mapping of objects beyond 50 levels of nested properties.
 
 Consider a source object with multiple levels of properties:

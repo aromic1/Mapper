@@ -33,3 +33,7 @@ project.lock.json
 docs/_build
 /src/LastMajorVersionBinary
 *.diagsession
+
+
+.vscode
+.config

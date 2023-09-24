@@ -3,72 +3,28 @@ using System.Reflection.Emit;
 
 namespace Aronic.Mapper;
 
-public static class ILGeneratorEx
+public static class IlGeneratorEx
 {
-    private record Signature(Type From, Type To);
-
-    /// <summary>
-    /// Dictionary is (From, To) -> Conv-OpCode
-    /// </summary>
-    // csharpier-ignore
-    private static readonly Dictionary<Signature, OpCode[]> fastConvertDispatch =
-        new()
-        {
-            { new(typeof(Double),   typeof(Int16)),     new[] { OpCodes.Conv_I2 } },
-            { new(typeof(Double),   typeof(Int32)),     new[] { OpCodes.Conv_I4 } },
-            { new(typeof(Double),   typeof(Int64)),     new[] { OpCodes.Conv_I8 } },
-            { new(typeof(Double),   typeof(UInt16)),    new[] { OpCodes.Conv_U2 } },
-            { new(typeof(Double),   typeof(UInt32)),    new[] { OpCodes.Conv_U4 } },
-            { new(typeof(Double),   typeof(UInt64)),    new[] { OpCodes.Conv_U8 } },
-            { new(typeof(Int16),    typeof(Double)),    new[] { OpCodes.Conv_R8 } },
-            { new(typeof(Int16),    typeof(Int32)),     new[] { OpCodes.Conv_I2 } },
-            { new(typeof(Int16),    typeof(Int64)),     new[] { OpCodes.Conv_I2 } },
-            { new(typeof(Int16),    typeof(UInt16)),    new[] { OpCodes.Conv_I2 } },
-            { new(typeof(Int16),    typeof(UInt32)),    new[] { OpCodes.Conv_I2 } },
-            { new(typeof(Int16),    typeof(UInt64)),    new[] { OpCodes.Conv_I2 } },
-            { new(typeof(Int32),    typeof(Double)),    new[] { OpCodes.Conv_R8 } },
-            { new(typeof(Int32),    typeof(Int64)),     new[] { OpCodes.Conv_I4 } },
-            { new(typeof(Int32),    typeof(UInt64)),    new[] { OpCodes.Conv_I4 } },
-            { new(typeof(Int64),    typeof(Double)),    new[] { OpCodes.Conv_R8 } },
-            { new(typeof(Int64),    typeof(Int16)),     new[] { OpCodes.Conv_I8 } },
-            { new(typeof(Int64),    typeof(Int32)),     new[] { OpCodes.Conv_I8 } },
-            { new(typeof(Int64),    typeof(UInt16)),    new[] { OpCodes.Conv_U8 } },
-            { new(typeof(Int64),    typeof(UInt32)),    new[] { OpCodes.Conv_U8 } },
-            { new(typeof(UInt16),   typeof(Double)),    new[] { OpCodes.Conv_R8 } },
-            { new(typeof(UInt16),   typeof(Int16)),     new[] { OpCodes.Conv_U2 } },
-            { new(typeof(UInt16),   typeof(Int32)),     new[] { OpCodes.Conv_U2 } },
-            { new(typeof(UInt16),   typeof(Int64)),     new[] { OpCodes.Conv_U2 } },
-            { new(typeof(UInt16),   typeof(UInt32)),    new[] { OpCodes.Conv_U2 } },
-            { new(typeof(UInt16),   typeof(UInt64)),    new[] { OpCodes.Conv_U2 } },
-            { new(typeof(UInt32),   typeof(Double)),    new[] { OpCodes.Conv_R_Un, OpCodes.Conv_R8 } },
-            { new(typeof(UInt32),   typeof(Int64)),     new[] { OpCodes.Conv_U4 } },
-            { new(typeof(UInt32),   typeof(UInt64)),    new[] { OpCodes.Conv_U4 } },
-            { new(typeof(UInt64),   typeof(Double)),    new[] { OpCodes.Conv_R_Un, OpCodes.Conv_R8 } },
-            { new(typeof(UInt64),   typeof(Int16)),     new[] { OpCodes.Conv_I8 } },
-            { new(typeof(UInt64),   typeof(Int32)),     new[] { OpCodes.Conv_I8 } },
-            { new(typeof(UInt64),   typeof(UInt16)),    new[] { OpCodes.Conv_U8 } },
-            { new(typeof(UInt64),   typeof(UInt32)),    new[] { OpCodes.Conv_U8 } },
-        };
-
     /// <summary>
     /// Assumes that the from entity is already loaded on the stack!
     /// </summary>
     /// <param name="ilGenerator">this</param>
-    /// <param name="from">The type being fast-converted from</param>
-    /// <param name="to">The type being fast-converted to</param>
+    /// <param name="fromType">The type being fast-converted from</param>
+    /// <param name="toType">The type being fast-converted to</param>
     /// <returns>this</returns>
-    public static void FastConvert(this ILGenerator ilGenerator, Type from, Type to)
+    public static void FastConvert(this ILGenerator ilGenerator, Type fromType, Type toType)
     {
-        if (to == typeof(String))
+        if (toType == typeof(String))
         {
-            var toString = from.GetMethod("ToString")!;
+            var toString = fromType.GetMethod("ToString")!;
             ilGenerator.EmitCall(OpCodes.Callvirt, toString, null);
         }
-        else if (from == typeof(Boolean) || to == typeof(Boolean))
+        else if (fromType == typeof(Boolean) ^ toType == typeof(Boolean))
         {
-            throw new NotImplementedException($"{to} <- {from}");
+            // We haven't implemented boolean conversions because it's actually kindof a pain.
+            throw new NotImplementedException($"{toType} <- {fromType}");
         }
-        else if (fastConvertDispatch.TryGetValue(new(from, to), out var fastConvertOpCodes))
+        else if (FastConvertUtil.ConvOpCodes.TryGetValue(new(fromType, toType), out var fastConvertOpCodes))
         {
             foreach (var opCode in fastConvertOpCodes)
             {
@@ -77,6 +33,10 @@ public static class ILGeneratorEx
         }
         else
         {
+            // for now, not doing anything seems to be the best option.
+            // It allows us to leave our conversion tables sparse at the cost of checks during the call.
+            //
+            // maybe later we'll actually handle all cases above...
             // throw new NotImplementedException($"{to} <- {from}");
         }
     }

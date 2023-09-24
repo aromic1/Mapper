@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Security.Cryptography;
 
 namespace Aronic.Mapper;
 
@@ -24,11 +23,9 @@ public abstract class ILMapperMixin : IMapper
         return invoke.Invoke(mapper, new object[] { from });
     }
 
-    public static bool CanFastConvert(Type toType, Type fromType) => PrimitiveTypes.Types.Contains(fromType) && PrimitiveTypes.Types.Contains(toType);
-
     public static object GetPrimitiveMapper(Type fromType, Type toType)
     {
-        if (!CanFastConvert(fromType, toType))
+        if (!FastConvertUtil.CanFastConvert(fromType, toType))
             throw new ArgumentException($"expected two primitive types");
         var delegateType = typeof(Func<,>).MakeGenericType(fromType, toType);
         // var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{to.Name},{from.Name}>", delegateType, new[] { from });
@@ -42,7 +39,7 @@ public abstract class ILMapperMixin : IMapper
 
     public Func<From, To> GetMapper<From, To>()
     {
-        if (CanFastConvert(typeof(From), typeof(To)))
+        if (FastConvertUtil.CanFastConvert(typeof(From), typeof(To)))
         {
             return (Func<From, To>)GetPrimitiveMapper(typeof(From), typeof(To));
         }
@@ -52,11 +49,11 @@ public abstract class ILMapperMixin : IMapper
         }
     }
 
-    public object GetMapper(Type fromType, Type toType) => CanFastConvert(fromType, toType) ? GetPrimitiveMapper(fromType, toType) : GetMapperInternal(fromType, toType);
+    public object GetMapper(Type fromType, Type toType) => FastConvertUtil.CanFastConvert(fromType, toType) ? GetPrimitiveMapper(fromType, toType) : GetMapperInternal(fromType, toType);
 
     private object GetMapperInternal(Type fromType, Type toType)
     {
-        if (CanFastConvert(fromType, toType))
+        if (FastConvertUtil.CanFastConvert(fromType, toType))
             return GetPrimitiveMapper(fromType, toType);
 
         var (fromProperties, toConstructorInfo) = GetMappingInfo(fromType, toType);
@@ -83,7 +80,7 @@ public abstract class ILMapperMixin : IMapper
             var toParam = toParameters[i];
             var fromProp = fromProperties[i];
             // csharpier-ignore
-            if (CanFastConvert(fromProp.PropertyType, toParam.ParameterType))
+            if (FastConvertUtil.CanFastConvert(fromProp.PropertyType, toParam.ParameterType))
             {
                 ilGenerator.Emit(OpCodes.Ldarg_1);                                      // from
                 ilGenerator.EmitCall(OpCodes.Callvirt, fromProp.GetMethod!, null);      //  .prop

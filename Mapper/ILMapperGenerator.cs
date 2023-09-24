@@ -1,104 +1,37 @@
-using Mapper;
-using System;
-using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Diagnostics;
 
-public static class ILGeneratorEx
-{
-    public static ILGenerator EmitEx(this ILGenerator ilGenerator, OpCode opCode)
-    {
-        ilGenerator.Emit(opCode);
-        return ilGenerator;
-    }
-
-    private record Signature(Type From, Type To);
-
-    /// <summary>
-    /// Dictionary is (From, To) -> Fluent Generation
-    /// </summary>
-    private static readonly Dictionary<Signature, Func<ILGenerator, ILGenerator>> fastConvertDispatch =
-        new()
-        // csharpier-ignore
-        {
-            { new(typeof(Int32),     typeof(Int16)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_I2) },
-            { new(typeof(Int64),     typeof(Int16)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_I2) },
-            { new(typeof(Int64),     typeof(Int32)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_I4) },
-            { new(typeof(Int16),     typeof(Int64)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_I8) },
-            { new(typeof(Int32),     typeof(Int64)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_I8) },
-            { new(typeof(UInt32),    typeof(UInt16)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_U2) },
-            { new(typeof(UInt64),    typeof(UInt16)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_U2) },
-            { new(typeof(UInt64),    typeof(UInt32)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_U4) },
-            { new(typeof(UInt16),    typeof(UInt64)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_U8) },
-            { new(typeof(UInt32),    typeof(UInt64)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_U8) },
-            { new(typeof(Int16),     typeof(UInt16)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_U2) },
-            { new(typeof(UInt16),    typeof(Int16)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_I2) },
-            { new(typeof(Int32),     typeof(UInt16)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_U2) },
-            { new(typeof(Int64),     typeof(UInt16)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_U2) },
-            { new(typeof(Int64),     typeof(UInt32)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_U4) },
-            { new(typeof(UInt32),    typeof(Int16)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_I2) },
-            { new(typeof(UInt64),    typeof(Int16)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_I2) },
-            { new(typeof(UInt64),    typeof(Int32)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_I4) },
-            { new(typeof(Int16),     typeof(UInt64)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_I8) },
-            { new(typeof(Int32),     typeof(UInt64)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_I8) },
-            { new(typeof(UInt16),    typeof(Int64)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_U8) },
-            { new(typeof(UInt32),    typeof(Int64)), ilGenerator => ilGenerator.EmitEx(OpCodes.Conv_U8) },
-        };
-
-    /// <summary>
-    /// Assumes that the from entity is already loaded on the stack!
-    /// </summary>
-    /// <param name="ilGenerator">this</param>
-    /// <param name="from">The type being fast-converted from</param>
-    /// <param name="to">The type being fast-converted to</param>
-    /// <returns>this</returns>
-    public static ILGenerator FastConvert(this ILGenerator ilGenerator, Type from, Type to)
-    {
-        if (to == typeof(String))
-        {
-            var toString = from.GetMethod("ToString")!;
-            ilGenerator.Emit(OpCodes.Callvirt, toString);
-            return ilGenerator.EmitEx(OpCodes.Callvirt);
-        }
-        else if (from == typeof(Boolean) || to == typeof(Boolean))
-        {
-            throw new NotImplementedException($"{to} <- {from}");
-        }
-        else if (fastConvertDispatch.TryGetValue(new(to, from), out var fastConverter))
-        {
-            return fastConverter(ilGenerator);
-        }
-        else
-        {
-            return ilGenerator;
-            // throw new NotImplementedException($"{to} <- {from}");
-        }
-    }
-}
+namespace Aronic.Mapper;
 
 /// <summary>
 /// Generates methods in IL using Reflection.Emit
 /// </summary>
 public class ILMapperGenerator : IMapperGenerator
 {
-    public static bool CanFastConvert(Type to, Type from) => PrimitiveTypes.Types.Contains(from) && PrimitiveTypes.Types.Contains(to);
+    private IMapper mapper;
 
-    public static object GeneratePrimitiveMapper(Type from, Type to)
+    public ILMapperGenerator(IMapper mapper)
     {
-        if (!CanFastConvert(from, to))
+        this.mapper = mapper;
+    }
+
+    public static bool CanFastConvert(Type toType, Type fromType) => PrimitiveTypes.Types.Contains(fromType) && PrimitiveTypes.Types.Contains(toType);
+
+    public static object GeneratePrimitiveMapper(Type fromType, Type toType)
+    {
+        if (!CanFastConvert(fromType, toType))
             throw new ArgumentException($"expected two primitive types");
-        var delegateType = typeof(Func<,>).MakeGenericType(from, to);
+        var delegateType = typeof(Func<,>).MakeGenericType(fromType, toType);
         // var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{to.Name},{from.Name}>", delegateType, new[] { from });
-        var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{to.Name},{from.Name}>", to, new[] { from });
+        var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{toType.Name},{fromType.Name}>", toType, new[] { fromType });
         var ilGenerator = dynamicMapper.GetILGenerator();
-        ilGenerator.EmitEx(OpCodes.Ldarg_0).FastConvert(from, to).EmitEx(OpCodes.Ret);
+        ilGenerator.EmitEx(OpCodes.Ldarg_0).FastConvert(fromType, toType).EmitEx(OpCodes.Ret);
         return dynamicMapper.CreateDelegate(delegateType);
     }
 
     public Func<From, To> GenerateMapper<From, To>() => (Func<From, To>)GeneratePrimitiveMapper(typeof(From), typeof(To));
 
-    public static object GenerateMapper(ConstructorInfo toConstructorInfo, PropertyInfo[] fromProperties, Type from, Type to)
+    public static object GenerateMapper(PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo, Type fromType, Type toType)
     {
         var toParameters = toConstructorInfo.GetParameters();
         if (toParameters == null)
@@ -106,13 +39,39 @@ public class ILMapperGenerator : IMapperGenerator
         if (toParameters.Length != fromProperties.Length)
             throw new ArgumentException($"toParameters length {toParameters.Length} does not match fromProperties length {fromProperties.Length}");
 
-        var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{to.Name},{from.Name}>", typeof(Func<>).MakeGenericType(to, from), new[] { from });
-        for (int i = 0; i < toParameters.Length; ++i) { }
-        throw new NotImplementedException();
+        var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{fromType.Name},{toType.Name}>", toType, new[] { fromType });
+        var ilGenerator = dynamicMapper.GetILGenerator();
+
+        for (int i = 0; i < toParameters.Length; ++i)
+        {
+            // foreach parameter:
+            //  load `from`
+            //  call the getter for the property
+            //  fast-convert if we can,
+            //      otherwise:
+            //      - load mapper
+            //      - load `from`
+            //      - load fromType
+            //      - load toType
+            //      - call mapper.Map(object,Type,Type);
+            var toParam = toParameters[i];
+            var fromProp = fromProperties[i];
+            if (CanFastConvert(fromProp.PropertyType, toParam.ParameterType))
+            {
+                ilGenerator.EmitEx(OpCodes.Ldarg_0).EmitCall(OpCodes.Callvirt, fromProp.GetMethod!, null);
+                ilGenerator.FastConvert(fromProp.PropertyType, toParam.ParameterType);
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+        ilGenerator.Emit(OpCodes.Newobj, toConstructorInfo);
+        ilGenerator.Emit(OpCodes.Ret);
+        
+        return dynamicMapper.CreateDelegate(typeof(Func<,>).MakeGenericType(fromType, toType));
     }
 
-    public Func<To, From> GenerateMapper<To, From>(ConstructorInfo toConstructorInfo, PropertyInfo[] fromProperties) =>
-        CanFastConvert(typeof(To), typeof(From))
-            ? GenerateMapper<To, From>()
-            : (Func<To, From>)GenerateMapper(toConstructorInfo, fromProperties, typeof(From), typeof(To));
+    public Func<From, To> GenerateMapper<From, To>(PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo) =>
+        (Func<From, To>)GenerateMapper(fromProperties, toConstructorInfo, typeof(From), typeof(To));
 }

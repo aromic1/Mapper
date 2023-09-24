@@ -1,3 +1,5 @@
+namespace Aronic.Mapper;
+
 public static class PrimitiveTypes
 {
     public static readonly Type[] Types = new[]

@@ -1,5 +1,11 @@
 public static class StealingTheCompilersHomework
 {
+    record Foo(int X);
+    public static void IntToString()
+    {
+        var foo = new Foo(1);
+        foo.X.ToString();
+    }
     /// <summary>
     /// I wrote this method so I could *steal the compiler's homework* for double conversions.
     /// </summary>

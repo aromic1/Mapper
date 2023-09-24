@@ -23,23 +23,9 @@ public abstract class ILMapperMixin : IMapper
         return invoke.Invoke(mapper, new object[] { from });
     }
 
-    public static object GetPrimitiveMapper(Type fromType, Type toType)
-    {
-        if (!FastConvertUtil.CanFastConvert(fromType, toType))
-            throw new ArgumentException($"expected two primitive types");
-        var delegateType = typeof(Func<,>).MakeGenericType(fromType, toType);
-        // var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{to.Name},{from.Name}>", delegateType, new[] { from });
-        var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{toType.Name},{fromType.Name}>", toType, new[] { fromType });
-        var ilGenerator = dynamicMapper.GetILGenerator();
-        ilGenerator.Emit(OpCodes.Ldarg_0);
-        ilGenerator.FastConvert(fromType, toType);
-        ilGenerator.Emit(OpCodes.Ret);
-        return dynamicMapper.CreateDelegate(delegateType);
-    }
-
     public Func<From, To> GetMapper<From, To>()
     {
-        if (FastConvertUtil.CanFastConvert(typeof(From), typeof(To)))
+        if (CanFastConvert(typeof(From), typeof(To)))
         {
             return (Func<From, To>)GetPrimitiveMapper(typeof(From), typeof(To));
         }
@@ -49,11 +35,27 @@ public abstract class ILMapperMixin : IMapper
         }
     }
 
-    public object GetMapper(Type fromType, Type toType) => FastConvertUtil.CanFastConvert(fromType, toType) ? GetPrimitiveMapper(fromType, toType) : GetMapperInternal(fromType, toType);
+    public object GetMapper(Type fromType, Type toType) => CanFastConvert(fromType, toType) ? GetPrimitiveMapper(fromType, toType) : GetMapperInternal(fromType, toType);
+
+    public static object GetPrimitiveMapper(Type fromType, Type toType)
+    {
+        if (!CanFastConvert(fromType, toType))
+            throw new ArgumentException($"expected two primitive types");
+        var delegateType = typeof(Func<,>).MakeGenericType(fromType, toType);
+        var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{toType.Name},{fromType.Name}>", toType, new[] { fromType });
+        var ilGenerator = dynamicMapper.GetILGenerator();
+        if (fromType.IsValueType && !toType.IsValueType)
+            ilGenerator.Emit(OpCodes.Ldarga, 0);
+        else
+            ilGenerator.Emit(OpCodes.Ldarg_0);
+        FastConvert(ilGenerator, fromType, toType);
+        ilGenerator.Emit(OpCodes.Ret);
+        return dynamicMapper.CreateDelegate(delegateType);
+    }
 
     private object GetMapperInternal(Type fromType, Type toType)
     {
-        if (FastConvertUtil.CanFastConvert(fromType, toType))
+        if (CanFastConvert(fromType, toType))
             return GetPrimitiveMapper(fromType, toType);
 
         var (fromProperties, toConstructorInfo) = GetMappingInfo(fromType, toType);
@@ -65,7 +67,17 @@ public abstract class ILMapperMixin : IMapper
             throw new ArgumentException($"toParameters length {toParameters.Length} does not match fromProperties length {fromProperties.Length}");
 
         var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{fromType.Name},{toType.Name}>", toType, new[] { typeof(IMapper), fromType }, typeof(ILMapperMixin));
+
         var ilGenerator = dynamicMapper.GetILGenerator();
+
+        // locals
+        // Our local variables are used just because sometimes we need an address for conversion (i.e. converting numeric types to string)
+        // But, we always set them before using them.
+        dynamicMapper.InitLocals = false;
+        for (int i = 0; i < toParameters.Length; ++i)
+        {
+            ilGenerator.DeclareLocal(fromProperties[i].PropertyType);
+        }
 
         var mapMethod = GetType().GetMethod("Map", new Type[] { typeof(object), typeof(Type), typeof(Type) });
         if (mapMethod == null)
@@ -80,11 +92,16 @@ public abstract class ILMapperMixin : IMapper
             var toParam = toParameters[i];
             var fromProp = fromProperties[i];
             // csharpier-ignore
-            if (FastConvertUtil.CanFastConvert(fromProp.PropertyType, toParam.ParameterType))
+            if (CanFastConvert(fromProp.PropertyType, toParam.ParameterType))
             {
                 ilGenerator.Emit(OpCodes.Ldarg_1);                                      // from
                 ilGenerator.EmitCall(OpCodes.Callvirt, fromProp.GetMethod!, null);      //  .prop
-                ilGenerator.FastConvert(fromProp.PropertyType, toParam.ParameterType);  // FastConvert()
+                ilGenerator.Emit(OpCodes.Stloc_S, i);                                   // locals[i] = from.prop
+                if (fromProp.PropertyType.IsValueType && toParam.ParameterType == typeof(String)) // if converting to string...
+                    ilGenerator.Emit(OpCodes.Ldloca_S, i);                              // &locals[i] // take address of local numeric
+                else
+                    ilGenerator.Emit(OpCodes.Ldloc_S, i);
+                FastConvert(ilGenerator, fromProp.PropertyType, toParam.ParameterType);  // FastConvert()
             }
             else
             {
@@ -105,4 +122,79 @@ public abstract class ILMapperMixin : IMapper
 
         return dynamicMapper.CreateDelegate(typeof(Func<,>).MakeGenericType(fromType, toType), this);
     }
+
+    public static readonly Type[] NumericTypes = new[] { typeof(Int16), typeof(Int32), typeof(Int64), typeof(UInt16), typeof(UInt32), typeof(UInt64), typeof(Double) };
+
+    public static bool CanFastConvert(Type fromType, Type toType) =>
+        toType == typeof(String) || NumericTypes.Contains(fromType) && NumericTypes.Contains(toType) || fromType == typeof(Boolean) && toType == typeof(Boolean);
+
+    public static void FastConvert(ILGenerator ilGenerator, Type fromType, Type toType)
+    {
+        if (toType == typeof(String))
+        {
+            var toString = fromType.GetMethod("ToString", Type.EmptyTypes)!;
+            if (fromType.IsValueType)
+                ilGenerator.EmitCall(OpCodes.Call, toString, null);
+            else
+                ilGenerator.EmitCall(OpCodes.Callvirt, toString, null);
+        }
+        else if (fromType == typeof(Boolean) ^ toType == typeof(Boolean))
+        {
+            // We haven't implemented boolean conversions because it's actually kindof a pain.
+            throw new NotImplementedException($"{toType} <- {fromType}");
+        }
+        else if (ConvOpCodes.TryGetValue(new(fromType, toType), out var fastConvertOpCodes))
+        {
+            foreach (var opCode in fastConvertOpCodes)
+            {
+                ilGenerator.Emit(opCode);
+            }
+        }
+        else { }
+    }
+
+    public record FastConvertSignature(Type From, Type To);
+
+    /// <summary>
+    /// Dictionary is (From, To) -> Conv-OpCode
+    /// </summary>
+    // csharpier-ignore
+    public static readonly Dictionary<FastConvertSignature, OpCode[]> ConvOpCodes =
+        new()
+        {
+            { new(typeof(Double),   typeof(Int16)),     new[] { OpCodes.Conv_I2 } },
+            { new(typeof(Double),   typeof(Int32)),     new[] { OpCodes.Conv_I4 } },
+            { new(typeof(Double),   typeof(Int64)),     new[] { OpCodes.Conv_I8 } },
+            { new(typeof(Double),   typeof(UInt16)),    new[] { OpCodes.Conv_U2 } },
+            { new(typeof(Double),   typeof(UInt32)),    new[] { OpCodes.Conv_U4 } },
+            { new(typeof(Double),   typeof(UInt64)),    new[] { OpCodes.Conv_U8 } },
+            { new(typeof(Int16),    typeof(Double)),    new[] { OpCodes.Conv_R8 } },
+            { new(typeof(Int16),    typeof(Int32)),     new[] { OpCodes.Conv_I2 } },
+            { new(typeof(Int16),    typeof(Int64)),     new[] { OpCodes.Conv_I2 } },
+            { new(typeof(Int16),    typeof(UInt16)),    new[] { OpCodes.Conv_I2 } },
+            { new(typeof(Int16),    typeof(UInt32)),    new[] { OpCodes.Conv_I2 } },
+            { new(typeof(Int16),    typeof(UInt64)),    new[] { OpCodes.Conv_I2 } },
+            { new(typeof(Int32),    typeof(Double)),    new[] { OpCodes.Conv_R8 } },
+            { new(typeof(Int32),    typeof(Int64)),     new[] { OpCodes.Conv_I4 } },
+            { new(typeof(Int32),    typeof(UInt64)),    new[] { OpCodes.Conv_I4 } },
+            { new(typeof(Int64),    typeof(Double)),    new[] { OpCodes.Conv_R8 } },
+            { new(typeof(Int64),    typeof(Int16)),     new[] { OpCodes.Conv_I8 } },
+            { new(typeof(Int64),    typeof(Int32)),     new[] { OpCodes.Conv_I8 } },
+            { new(typeof(Int64),    typeof(UInt16)),    new[] { OpCodes.Conv_U8 } },
+            { new(typeof(Int64),    typeof(UInt32)),    new[] { OpCodes.Conv_U8 } },
+            { new(typeof(UInt16),   typeof(Double)),    new[] { OpCodes.Conv_R8 } },
+            { new(typeof(UInt16),   typeof(Int16)),     new[] { OpCodes.Conv_U2 } },
+            { new(typeof(UInt16),   typeof(Int32)),     new[] { OpCodes.Conv_U2 } },
+            { new(typeof(UInt16),   typeof(Int64)),     new[] { OpCodes.Conv_U2 } },
+            { new(typeof(UInt16),   typeof(UInt32)),    new[] { OpCodes.Conv_U2 } },
+            { new(typeof(UInt16),   typeof(UInt64)),    new[] { OpCodes.Conv_U2 } },
+            { new(typeof(UInt32),   typeof(Double)),    new[] { OpCodes.Conv_R_Un, OpCodes.Conv_R8 } },
+            { new(typeof(UInt32),   typeof(Int64)),     new[] { OpCodes.Conv_U4 } },
+            { new(typeof(UInt32),   typeof(UInt64)),    new[] { OpCodes.Conv_U4 } },
+            { new(typeof(UInt64),   typeof(Double)),    new[] { OpCodes.Conv_R_Un, OpCodes.Conv_R8 } },
+            { new(typeof(UInt64),   typeof(Int16)),     new[] { OpCodes.Conv_I8 } },
+            { new(typeof(UInt64),   typeof(Int32)),     new[] { OpCodes.Conv_I8 } },
+            { new(typeof(UInt64),   typeof(UInt16)),    new[] { OpCodes.Conv_U8 } },
+            { new(typeof(UInt64),   typeof(UInt32)),    new[] { OpCodes.Conv_U8 } },
+        };
 }

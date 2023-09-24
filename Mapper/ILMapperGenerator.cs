@@ -25,13 +25,15 @@ public class ILMapperGenerator : IMapperGenerator
         // var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{to.Name},{from.Name}>", delegateType, new[] { from });
         var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{toType.Name},{fromType.Name}>", toType, new[] { fromType });
         var ilGenerator = dynamicMapper.GetILGenerator();
-        ilGenerator.EmitEx(OpCodes.Ldarg_0).FastConvert(fromType, toType).EmitEx(OpCodes.Ret);
+        ilGenerator.Emit(OpCodes.Ldarg_0);
+        ilGenerator.FastConvert(fromType, toType);
+        ilGenerator.Emit(OpCodes.Ret);
         return dynamicMapper.CreateDelegate(delegateType);
     }
 
     public Func<From, To> GenerateMapper<From, To>() => (Func<From, To>)GeneratePrimitiveMapper(typeof(From), typeof(To));
 
-    public static object GenerateMapper(PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo, Type fromType, Type toType)
+    private object GenerateMapper(PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo, Type fromType, Type toType)
     {
         var toParameters = toConstructorInfo.GetParameters();
         if (toParameters == null)
@@ -39,8 +41,12 @@ public class ILMapperGenerator : IMapperGenerator
         if (toParameters.Length != fromProperties.Length)
             throw new ArgumentException($"toParameters length {toParameters.Length} does not match fromProperties length {fromProperties.Length}");
 
-        var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{fromType.Name},{toType.Name}>", toType, new[] { fromType });
+        var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{fromType.Name},{toType.Name}>", toType, new[] { fromType, typeof(IMapper) });
         var ilGenerator = dynamicMapper.GetILGenerator();
+
+        var mapMethod = mapper.GetType().GetMethod("Map", new Type[] { typeof(Type), typeof(Type) });
+        if (mapMethod == null)
+            throw new Exception("map method not found!");
 
         for (int i = 0; i < toParameters.Length; ++i)
         {
@@ -58,20 +64,32 @@ public class ILMapperGenerator : IMapperGenerator
             var fromProp = fromProperties[i];
             if (CanFastConvert(fromProp.PropertyType, toParam.ParameterType))
             {
-                ilGenerator.EmitEx(OpCodes.Ldarg_0).EmitCall(OpCodes.Callvirt, fromProp.GetMethod!, null);
+                ilGenerator.Emit(OpCodes.Ldarg_0);
+                ilGenerator.EmitCall(OpCodes.Callvirt, fromProp.GetMethod!, null);
                 ilGenerator.FastConvert(fromProp.PropertyType, toParam.ParameterType);
             }
             else
             {
+                // mapper | from.prop | fromType | toType || call(mapMethod)
+                ilGenerator.Emit(OpCodes.Ldarg_1);
+                ilGenerator.Emit(OpCodes.Ldarg_0);
+                ilGenerator.EmitCall(OpCodes.Callvirt, fromProp.GetMethod!, null);
+                ilGenerator.Emit(OpCodes.Ldtoken, fromType);
+                ilGenerator.Emit(OpCodes.Ldtoken, toType);
+                ilGenerator.EmitCall(OpCodes.Callvirt, mapMethod, null);
+                // ilGenerator.EmitEx(OpCodes.Ldarg_0).EmitCall(OpCodes.Callvirt, fromProp.GetMethod!, null);
                 throw new NotImplementedException();
             }
         }
         ilGenerator.Emit(OpCodes.Newobj, toConstructorInfo);
         ilGenerator.Emit(OpCodes.Ret);
-        
-        return dynamicMapper.CreateDelegate(typeof(Func<,>).MakeGenericType(fromType, toType));
+
+        return dynamicMapper.CreateDelegate(typeof(Func<,,>).MakeGenericType(fromType, typeof(IMapper), toType));
     }
 
-    public Func<From, To> GenerateMapper<From, To>(PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo) =>
-        (Func<From, To>)GenerateMapper(fromProperties, toConstructorInfo, typeof(From), typeof(To));
+    public Func<From, To> GenerateMapper<From, To>(PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo)
+    {
+        var withoutMapper = (Func<From, IMapper, To>)GenerateMapper(fromProperties, toConstructorInfo, typeof(From), typeof(To));
+        return (From from) => withoutMapper(from, mapper);
+    }
 }

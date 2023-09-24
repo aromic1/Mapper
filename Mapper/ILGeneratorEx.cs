@@ -5,18 +5,6 @@ namespace Aronic.Mapper;
 
 public static class ILGeneratorEx
 {
-    public static ILGenerator EmitEx(this ILGenerator ilGenerator, OpCode opCode)
-    {
-        ilGenerator.Emit(opCode);
-        return ilGenerator;
-    }
-
-    public static ILGenerator EmitEx(this ILGenerator ilGenerator, OpCode opCode, MethodInfo methodInfo)
-    {
-        ilGenerator.Emit(opCode);
-        return ilGenerator;
-    }
-
     private record Signature(Type From, Type To);
 
     /// <summary>
@@ -57,13 +45,12 @@ public static class ILGeneratorEx
     /// <param name="from">The type being fast-converted from</param>
     /// <param name="to">The type being fast-converted to</param>
     /// <returns>this</returns>
-    public static ILGenerator FastConvert(this ILGenerator ilGenerator, Type from, Type to)
+    public static void FastConvert(this ILGenerator ilGenerator, Type from, Type to)
     {
         if (to == typeof(String))
         {
             var toString = from.GetMethod("ToString")!;
             ilGenerator.EmitCall(OpCodes.Callvirt, toString, null);
-            return ilGenerator;
         }
         else if (from == typeof(Boolean) || to == typeof(Boolean))
         {
@@ -71,11 +58,11 @@ public static class ILGeneratorEx
         }
         else if (fastConvertDispatch.TryGetValue(new(to, from), out var fastConvertOpCode))
         {
-            return ilGenerator.EmitEx(fastConvertOpCode);
+            ilGenerator.Emit(fastConvertOpCode);
+
         }
         else
         {
-            return ilGenerator;
             // throw new NotImplementedException($"{to} <- {from}");
         }
     }

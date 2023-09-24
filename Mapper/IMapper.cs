@@ -20,7 +20,7 @@ public interface IMapper
         return invoke.Invoke(mapper, new object[] { from });
     }
 
-    public To? Map<From, To>(From? from) => from == null ? default : GetMapper<From, To>()(from);
+    public To? Map<To, From>(From? from) => from == null ? default : GetMapper<From, To>()(from);
 
     public object GetMapper(Type fromType, Type toType);
     public Func<From, To> GetMapper<From, To>() => (Func<From, To>)GetMapper(typeof(From), typeof(To));

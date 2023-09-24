@@ -11,6 +11,8 @@ public abstract class ILMapperMixin : IMapper
 {
     public abstract (PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo) GetMappingInfo(Type fromType, Type toType);
 
+    // public To? Map<From, To>(From? from) => from == null ? default : GetMapper<From, To>()(from);
+
     public object? Map(object? from, Type fromType, Type toType)
     {
         if (from == null)
@@ -72,6 +74,10 @@ public abstract class ILMapperMixin : IMapper
         if (mapMethod == null)
             throw new Exception("map method not found!");
 
+        var getTypeFromHandle = typeof(Type).GetMethod("GetTypeFromHandle", new[] { typeof(System.RuntimeTypeHandle) });
+        if (getTypeFromHandle == null)
+            throw new Exception("getRuntimeTypeFromHandle method not found!");
+
         for (int i = 0; i < toParameters.Length; ++i)
         {
             var toParam = toParameters[i];
@@ -88,8 +94,12 @@ public abstract class ILMapperMixin : IMapper
                 ilGenerator.Emit(OpCodes.Ldarg_0);                                      // this
                 ilGenerator.Emit(OpCodes.Ldarg_1);                                      // from
                 ilGenerator.EmitCall(OpCodes.Callvirt, fromProp.GetMethod!, null);      //  .prop
-                ilGenerator.Emit(OpCodes.Ldtoken, fromType);                            // fromType
-                ilGenerator.Emit(OpCodes.Ldtoken, toType);                              // toType
+                ilGenerator.Emit(OpCodes.Ldtoken, fromProp.PropertyType);               // from.prop type-handle
+                // see the following line in dump.il:
+                // IL_002d:  call       class [System.Runtime]System.Type [System.Runtime]System.Type::GetTypeFromHandle(valuetype [System.Runtime]System.RuntimeTypeHandle)
+                ilGenerator.EmitCall(OpCodes.Call, getTypeFromHandle, null);            // from.prop type-object
+                ilGenerator.Emit(OpCodes.Ldtoken, toParam.ParameterType);               // toParam.ParameterType type-handle
+                ilGenerator.EmitCall(OpCodes.Call, getTypeFromHandle, null);            // toParam.ParameterType type-object
                 ilGenerator.EmitCall(OpCodes.Callvirt, mapMethod, null);                // Map()
             }
         }

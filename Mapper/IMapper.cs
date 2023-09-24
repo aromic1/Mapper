@@ -2,13 +2,8 @@ using System.Reflection;
 
 namespace Aronic.Mapper;
 
-/// <summary>
-/// Singleton.  Does the stuff.
-/// </summary>
 public interface IMapper
 {
-    public (PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo) GetMappingInfo(Type fromType, Type toType);
-
     public object? Map(object? from, Type fromType, Type toType)
     {
         if (from == null)
@@ -23,5 +18,6 @@ public interface IMapper
     public To? Map<To, From>(From? from) => from == null ? default : GetMapper<From, To>()(from);
 
     public object GetMapper(Type fromType, Type toType);
+
     public Func<From, To> GetMapper<From, To>() => (Func<From, To>)GetMapper(typeof(From), typeof(To));
 }

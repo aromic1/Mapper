@@ -2,6 +2,7 @@ namespace Tests;
 
 using System;
 using System.Reflection;
+using NUnit.Framework;
 using Aronic.Mapper;
 
 record PointFrom(int X, int Y, int Z);
@@ -183,7 +184,7 @@ public class ILMapperGeneratorDerivedTypesTests
         var dummyMapper = new DummyMapper();
 
         var objMapper = dummyMapper.GetMapper<ObjHolder, StrHolder>();
-        var objHolder = new ObjHolder(new PointFrom(1,2,3), new PointToString("A", "B"));
+        var objHolder = new ObjHolder(new PointFrom(1, 2, 3), new PointToString("A", "B"));
         var strHolder = objMapper(objHolder);
 
         Assert.That(strHolder, Is.TypeOf(typeof(StrHolder)));

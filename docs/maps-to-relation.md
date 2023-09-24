@@ -1,13 +1,15 @@
-# *algebraic-subtypes*
+# The *Maps-To* Relation
 
-Here we'll define the term *algebraic-subtypes*.
+Here we'll define the *maps-to* relation.
 
 Whenever you're defining your own typing system, you typically need to start off with some *built-in* or *primitive* types.  For us, the *primitive* types are:
 
-* `System.Int32`
-* `System.Int64`
+* The **Numeric** types:
+    - `System.Int32`
+    - `System.Int64`
+    - `System.Double`
+* `System.Boolean`
 * `System.String`
-* `System.Double`
 
 Then, there is an inductive (recursive) definition given based off of some sort of *type constructors*, which enable you to combine the types in some relevant way.  Our *type constructors* are:
 
@@ -26,27 +28,27 @@ A programmer might complain that we dont have a `Dictionary`, or some other impo
 
 We denote the minimal-fixed point of the above inductive definition as $\mathcal{T}$.  We will denote $C^\#$ all types in the `C#` programming language.  Note that $\mathcal{T} \subset C^\#$.
 
-In order to define the *algebraic-subtype relation*, we define a function `GetProperties(Type t) -> PropertyInfo[]`.  We won't be overly formal, here we are talking about properties on type `t` that are `public`.  The important information in `PropertyInfo` for us is `PropertyType` and `Name`, these correspond to $T_i\; l_i$ in the definition of $\mathcal{T}$.
+<!-- In order to define the *maps-to* relation, we define a function `GetProperties(Type t) -> PropertyInfo[]`.  We won't be overly formal, here we are talking about properties on type `t` that are `public`.  The important information in `PropertyInfo` for us is `PropertyType` and `Name`, these correspond to $T_i\; l_i$ in the definition of $\mathcal{T}$. -->
 
-Now that we have described our type system and the `GetProperties` method, we must describe the *algebraic-subtype relation*.  This relation is defined on $\mathcal{T}\times C^\#$ and is denoted $\prec$ - that is:
-> $t \prec u$ means *t is from our type-system $\mathcal{T}$, and is an algebraic-subtype of u, which comes from $C^\#$*.
+Now that we have described our type system, we can describe the *maps-to* relation.  This relation is first defined on $\mathcal{T}\times \mathcal{T}$ and is denoted $\supset$ - that is:
+> $t \supset u$ means *$t$ maps-to $u$*.
 
 First, the trivial case:
 
-* $(\forall t : \mathcal{T})\; t \prec t\;\;\;\;$ (reflexivity)
+* $(\forall t : \mathcal{T})\; t \supset t\;\;\;\;$ (reflexivity)
 
 Next, we have some *built-in* relations:
 
-* `System.Int64` $\prec$ `System.Int32`
-* `System.Double` $\prec$ `System.Int64`
+* Any Type *maps-to* `System.String`
+* Any **Numeric** Type *maps-to* any other **Numeric** Type
 
-Then we describe how our type constructors interplay with the relation.  Here we are only looking at $\mathcal{T}\times\mathcal{T}$, we will extend it to $\mathcal{T}\times C^\#$ next.
+Then we describe how our type constructors interplay with the relation.
 
-* $t \prec u \Rightarrow [t] \prec [u]$
-* Let $t = R(T_i\;l_i)_{i=1}^n$ and let $u = R(U_j\;k_j)_{j=1}^m$  Then we have that $t \prec u$ when:
+* $t \supset u \Rightarrow [t] \supset [u]$
+* Let $t = R(T_i\;l_i)_{i=1}^n$ and let $u = R(U_j\;k_j)_{j=1}^m$  Then we have that $t \supset u$ when:
     - $\forall l_i \; \exists ! k_j : l_i = k_j$
-    - $l_i = k_j \Rightarrow T_i \prec U_j$
+    - $l_i = k_j \Rightarrow T_i \supset U_j$
 
-In other words, the `[]` type constructor is covariant, and our `records` achieve subtyping when the *To* type has a subset of the properties of the *From* type, and each *To* property is a subtype of the corresponding *From* property.
+In English, this states that for every label in $t$ there is a corresponding label in $u$, and that the types corresponding to that label *maps-to* properly.  Intuitively, type $t$ *maps-to* type $u$ when $t$'s properties are a "compatible superset" of $u$'s properties.  For `[]`, it's clear that it covariantly respects the relation.
 
-Note that since we are considering our data-types to be for the purpose of *viewing*, we don't have to worry about issues with the array types $[t]$ being invariant: we get covariance because we aren't worried about assignment compatibility.
+The *maps-to* relation is just then the minimal fixed-point of the inductive system described.

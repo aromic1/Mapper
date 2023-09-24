@@ -10,8 +10,6 @@ public abstract class ILMapperMixin : IMapper
 {
     public abstract (PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo) GetMappingInfo(Type fromType, Type toType);
 
-    // public To? Map<From, To>(From? from) => from == null ? default : GetMapper<From, To>()(from);
-
     public object? Map(object? from, Type fromType, Type toType)
     {
         if (from == null)
@@ -23,28 +21,21 @@ public abstract class ILMapperMixin : IMapper
         return invoke.Invoke(mapper, new object[] { from });
     }
 
-    public Func<From, To> GetMapper<From, To>()
-    {
-        if (CanFastConvert(typeof(From), typeof(To)))
-        {
-            return (Func<From, To>)GetPrimitiveMapper(typeof(From), typeof(To));
-        }
-        else
-        {
-            return (Func<From, To>)GetMapper(typeof(From), typeof(To));
-        }
-    }
+    public Func<From, To> GetMapper<From, To>() =>
+        CanFastConvert(typeof(From), typeof(To)) ? (Func<From, To>)GetFastConvertMapper(typeof(From), typeof(To)) : (Func<From, To>)GetMapper(typeof(From), typeof(To));
 
-    public object GetMapper(Type fromType, Type toType) => CanFastConvert(fromType, toType) ? GetPrimitiveMapper(fromType, toType) : GetMapperInternal(fromType, toType);
+    public object GetMapper(Type fromType, Type toType) => CanFastConvert(fromType, toType) ? GetFastConvertMapper(fromType, toType) : GetMapperInternal(fromType, toType);
 
-    public static object GetPrimitiveMapper(Type fromType, Type toType)
+    public static object GetFastConvertMapper(Type fromType, Type toType)
     {
         if (!CanFastConvert(fromType, toType))
             throw new ArgumentException($"expected two primitive types");
         var delegateType = typeof(Func<,>).MakeGenericType(fromType, toType);
         var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{toType.Name},{fromType.Name}>", toType, new[] { fromType });
         var ilGenerator = dynamicMapper.GetILGenerator();
-        if (fromType.IsValueType && !toType.IsValueType)
+        // In this case we know we are going to call ToString(),
+        // and we need the address of arg_i, not just the value
+        if (fromType.IsValueType && toType == typeof(String))
             ilGenerator.Emit(OpCodes.Ldarga, 0);
         else
             ilGenerator.Emit(OpCodes.Ldarg_0);
@@ -56,7 +47,7 @@ public abstract class ILMapperMixin : IMapper
     private object GetMapperInternal(Type fromType, Type toType)
     {
         if (CanFastConvert(fromType, toType))
-            return GetPrimitiveMapper(fromType, toType);
+            return GetFastConvertMapper(fromType, toType);
 
         var (fromProperties, toConstructorInfo) = GetMappingInfo(fromType, toType);
 
@@ -97,6 +88,7 @@ public abstract class ILMapperMixin : IMapper
                 ilGenerator.Emit(OpCodes.Ldarg_1);                                      // from
                 ilGenerator.EmitCall(OpCodes.Callvirt, fromProp.GetMethod!, null);      //  .prop
                 ilGenerator.Emit(OpCodes.Stloc_S, i);                                   // locals[i] = from.prop
+                // Same situation as above...
                 if (fromProp.PropertyType.IsValueType && toParam.ParameterType == typeof(String)) // if converting to string...
                     ilGenerator.Emit(OpCodes.Ldloca_S, i);                              // &locals[i] // take address of local numeric
                 else
@@ -146,17 +138,14 @@ public abstract class ILMapperMixin : IMapper
         else if (ConvOpCodes.TryGetValue(new(fromType, toType), out var fastConvertOpCodes))
         {
             foreach (var opCode in fastConvertOpCodes)
-            {
                 ilGenerator.Emit(opCode);
-            }
         }
-        else { }
     }
 
     public record FastConvertSignature(Type From, Type To);
 
     /// <summary>
-    /// Dictionary is (From, To) -> Conv-OpCode
+    /// Dictionary is (From, To) -> Conv-OpCode(s)
     /// </summary>
     // csharpier-ignore
     public static readonly Dictionary<FastConvertSignature, OpCode[]> ConvOpCodes =

@@ -34,6 +34,6 @@ docs/_build
 /src/LastMajorVersionBinary
 *.diagsession
 
-
+PerformanceTests/BenchmarkDotNet.Artifacts/
 .vscode
 .config

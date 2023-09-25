@@ -10,9 +10,11 @@
     - read about the [*maps-to*](./docs/maps-to-relation.md)
     - validate the from/to types in your code
     - simplify it.  Part of the reason for this is simplicity.  Also it's a lot simpler.  Also, it's really easy to just do `things.Select(mapper.Map<From,To>)`, so we don't have to reinvent that wheel too much.
-* I will create a benchmarking harness / side-project for comparing the `IMappers`.
+* ~~I will create a benchmarking harness~~ We will use [BenchmarkDotNet](./PerformanceTests/readme.md).  The project is locate in `PerformanceTests/`
     - we need to test against many-many simple, small data-structures and many complex, big data-structures
-    - we need statistical ouputs (mean, max, min, std, n) x (`ILMapper`, `ReflectionOnlyMapper`, `AutoMapper`)
+        - This is made pretty easy with the framework.  Figuring out what is compatible with `AutoMapper` will be annoying...
+        - I don't know if we should continue with the `Pair` records I've been using, they are boring and annoying, a simple data-model would suffice...
+    - ~~we need statistical ouputs (mean, max, min, std, n) x (`ILMapper`, `ReflectionOnlyMapper`, `AutoMapper`)~~ check the framework
 
 Remarks...
 * Keep writing tests for new functionality, try to keep it kind of clean.

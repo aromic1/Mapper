@@ -24,7 +24,7 @@ public abstract class ILMapperMixin : IMapper
     public Func<From, To> GetMapper<From, To>() =>
         CanFastConvert(typeof(From), typeof(To)) ? (Func<From, To>)GetFastConvertMapper(typeof(From), typeof(To)) : (Func<From, To>)GetMapper(typeof(From), typeof(To));
 
-    public object GetMapper(Type fromType, Type toType) => CanFastConvert(fromType, toType) ? GetFastConvertMapper(fromType, toType) : GetMapperInternal(fromType, toType);
+    public virtual object GetMapper(Type fromType, Type toType) => CanFastConvert(fromType, toType) ? GetFastConvertMapper(fromType, toType) : GetMapperInternal(fromType, toType);
 
     public static object GetFastConvertMapper(Type fromType, Type toType)
     {

@@ -6,15 +6,17 @@ using Aronic.Mapper.Tests;
 
 namespace MyBenchmarks
 {
-    public class DummyMapperVsAutoMapper
+    public class DummyBenchmarks
     {
-        private const int N = 1000;
+        private const int N = 10000;
         private readonly PairPointFrom[] pairPointFroms;
+        private readonly PairPointTo[] pairPointTos;
 
         private readonly MapperConfiguration mapperConfiguration;
 
-        public DummyMapperVsAutoMapper()
+        public DummyBenchmarks()
         {
+            pairPointTos = new PairPointTo[N];
             pairPointFroms = new PairPointFrom[N];
             for (int i = 0; i < pairPointFroms.Length; ++i)
                 pairPointFroms[i] = RandomUtil.RandomPairPointFrom();
@@ -28,24 +30,38 @@ namespace MyBenchmarks
         }
 
         [Benchmark]
-        public PairPointTo[] DummyMapToShort()
+        public void AutoMapToShort()
         {
-            var dummyMapper = new DummyMapper();
-            var pairMapper = dummyMapper.GetMapper<PairPointFrom, PairPointTo>();
-            var result = new PairPointTo[N];
+            var mapper = mapperConfiguration.CreateMapper();
             for (int i = 0; i < pairPointFroms.Length; ++i)
-                result[i] = pairMapper(pairPointFroms[i]);
-            return result;
+                pairPointTos[i] = mapper.Map<PairPointTo>(pairPointFroms[i]);
+        }
+
+        // This one is so slow it's not worth running...
+        // [Benchmark]
+        // public void DummyMapperToShort()
+        // {
+        //     var dummyMapper = new DummyMapper();
+        //     var pairMapper = dummyMapper.GetMapper<PairPointFrom, PairPointTo>();
+        //     for (int i = 0; i < pairPointFroms.Length; ++i)
+        //         pairPointTos[i] = pairMapper(pairPointFroms[i]);
+        // }
+
+        [Benchmark]
+        public void DummyMapperWithCacheToShort()
+        {
+            var dummyMapperWithCache = new DummyMapperWithCache();
+            var pairMapper = dummyMapperWithCache.GetMapper<PairPointFrom, PairPointTo>();
+            for (int i = 0; i < pairPointFroms.Length; ++i)
+                pairPointTos[i] = pairMapper(pairPointFroms[i]);
         }
 
         [Benchmark]
-        public PairPointTo[] AutoMapToShort()
+        public void LambdMapToShort()
         {
-            var mapper = mapperConfiguration.CreateMapper();
-            var result = new PairPointTo[N];
+            var mapper = (PairPointFrom from) => new PairPointTo(new((short)from.L.X, (short)from.L.Y), new((short)from.R.X, (short)from.R.Y));
             for (int i = 0; i < pairPointFroms.Length; ++i)
-                result[i] = mapper.Map<PairPointTo>(pairPointFroms[i]);
-            return result;
+                pairPointTos[i] = mapper(pairPointFroms[i]);
         }
     }
 
@@ -53,7 +69,7 @@ namespace MyBenchmarks
     {
         public static void Main(string[] args)
         {
-            var summary = BenchmarkRunner.Run<DummyMapperVsAutoMapper>();
+            var summary = BenchmarkRunner.Run<DummyBenchmarks>();
         }
     }
 }

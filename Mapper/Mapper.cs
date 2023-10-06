@@ -26,11 +26,11 @@ namespace Aronic.Mapper
         public override (PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo) GetMappingInfo(Type fromType, Type toType)
         {
             var fromTypeProperties = fromType.GetProperties();
-            var toTypeConstructorsThatCanBeUsed = toType.GetConstructors().Where(x => x.GetParameters().Length <= fromTypeProperties.Length).ToArray();
+            var toTypeConstructorsThatCanBeUsed = toType.GetConstructors().Where(x => x.GetParameters().Length <= fromTypeProperties.Length).OrderByDescending(x => x.GetParameters().Length).ToArray();
             var fromTypePropsToReturn = new List<PropertyInfo>();
             if (toType.IsAssignableFrom(fromType))
             {
-                var constructorToUse = toTypeConstructorsThatCanBeUsed.OrderByDescending(x => x.GetParameters().Length).First();
+                var constructorToUse = toTypeConstructorsThatCanBeUsed.First();
                 var toTypeParams = constructorToUse.GetParameters();
                 foreach (var toTypeParam in toTypeParams)
                 {
@@ -49,7 +49,7 @@ namespace Aronic.Mapper
                     var toParameter = toTypeParameters[i];
                     var fromPropertyType = fromProperty.GetType();
                     var toParameterType = toParameter.GetType();
-                    if (fromProperty.Name == toParameter.Name && (CanFastConvert(fromPropertyType, toParameterType) || (FastTypeInfo.IsRecordType(toParameterType) && FastTypeInfo.IsRecordType(fromPropertyType))))
+                    if (fromProperty.Name == toParameter.Name && (fromPropertyType == toParameterType || CanFastConvert(fromPropertyType, toParameterType) || (FastTypeInfo.IsRecordType(toParameterType) && FastTypeInfo.IsRecordType(fromPropertyType))))
                     {
                         i++;
                         fromTypePropsToReturn.Add(fromProperty);

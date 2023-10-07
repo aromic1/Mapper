@@ -25,10 +25,14 @@ namespace Aronic.Mapper
 
     public class ILMapper : ILMapperMixin
     {
+        private bool IsMappableTo(Type fromType, Type toType)
+        {
+            throw new NotImplementedException();
+        }
+
         public override (PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo) GetMappingInfo(Type fromType, Type toType)
         {
             var fromPropertiesByName = fromType.GetProperties().ToDictionary(property => property.Name, property => property);
-            bool canMap(Type fromType, Type toType) => fromType == toType || CanFastConvert(fromType, toType) || (FastTypeInfo.IsRecordType(toType) && FastTypeInfo.IsRecordType(fromType));
 
             foreach (var constructor in toType.GetConstructors())
             {
@@ -39,7 +43,7 @@ namespace Aronic.Mapper
                             .GetParameters()
                             .Select(toParameter =>
                             {
-                                if (fromPropertiesByName.TryGetValue(toParameter.Name!, out var fromProperty) && canMap(fromProperty.PropertyType, toParameter.ParameterType))
+                                if (fromPropertiesByName.TryGetValue(toParameter.Name!, out var fromProperty) && IsMappableTo(fromProperty.PropertyType, toParameter.ParameterType))
                                     return fromProperty;
                                 else
                                     throw new CantMapError();

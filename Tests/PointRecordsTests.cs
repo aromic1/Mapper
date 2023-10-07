@@ -1,18 +1,18 @@
 using NUnit.Framework;
 
-namespace Aronic.Mapper.Tests;
+namespace Aronic.Mapper.Tests.PointRecords;
 
-public class ILMapperGeneratorDerivedTypesTests
+public abstract class PointRecordsTests
 {
     [SetUp]
     public void Setup() { }
 
+    protected abstract IMapper Mapper { get; }
+
     [Test]
     public void mapping_PointFrom_to_PointTo()
     {
-        var dummyMapper = new DummyMapper();
-
-        var pointMapper = dummyMapper.GetMapper<PointFrom, PointTo>();
+        var pointMapper = Mapper.GetMapper<PointFrom, PointTo>();
         var pointFrom = new PointFrom(1, 2, 3);
         var pointTo = pointMapper(pointFrom);
 
@@ -24,9 +24,7 @@ public class ILMapperGeneratorDerivedTypesTests
     [Test]
     public void mapping_PairPointFrom_to_PairPointTo()
     {
-        var dummyMapper = new DummyMapper();
-
-        var pairMapper = dummyMapper.GetMapper<PairPointFrom, PairPointTo>();
+        var pairMapper = Mapper.GetMapper<PairPointFrom, PairPointTo>();
         var pairPointFrom = new PairPointFrom(new(1, 2, 3), new(4, 5, 6));
         var pairPointTo = pairMapper(pairPointFrom);
 
@@ -40,9 +38,7 @@ public class ILMapperGeneratorDerivedTypesTests
     [Test]
     public void mapping_PointFrom_to_PointToDouble()
     {
-        var dummyMapper = new DummyMapper();
-
-        var pointMapper = dummyMapper.GetMapper<PointFrom, PointToDouble>();
+        var pointMapper = Mapper.GetMapper<PointFrom, PointToDouble>();
         // var pointFrom = new PointFrom(1, 2, 3);
         var pointFrom = new PointFrom(0, 0, 0);
         var pointTo = pointMapper(pointFrom);
@@ -55,9 +51,7 @@ public class ILMapperGeneratorDerivedTypesTests
     [Test]
     public void mapping_PairPointFrom_to_PairPointToDouble()
     {
-        var dummyMapper = new DummyMapper();
-
-        var pairMapper = dummyMapper.GetMapper<PairPointFrom, PairPointToDouble>();
+        var pairMapper = Mapper.GetMapper<PairPointFrom, PairPointToDouble>();
         var pairPointFrom = new PairPointFrom(new(1, 2, 3), new(4, 5, 6));
         var pairPointToDouble = pairMapper(pairPointFrom);
 
@@ -71,9 +65,7 @@ public class ILMapperGeneratorDerivedTypesTests
     [Test]
     public void mapping_PointFrom_to_PointToString()
     {
-        var dummyMapper = new DummyMapper();
-
-        var pointMapper = dummyMapper.GetMapper<PointFrom, PointToString>();
+        var pointMapper = Mapper.GetMapper<PointFrom, PointToString>();
         var pointFrom = new PointFrom(1, 2, 3);
         var pointTo = pointMapper(pointFrom);
 
@@ -85,9 +77,7 @@ public class ILMapperGeneratorDerivedTypesTests
     [Test]
     public void mapping_PairPointFrom_to_PairPointToString()
     {
-        var dummyMapper = new DummyMapper();
-
-        var pairMapper = dummyMapper.GetMapper<PairPointFrom, PairPointToString>();
+        var pairMapper = Mapper.GetMapper<PairPointFrom, PairPointToString>();
         var pairPointFrom = new PairPointFrom(new(1, 2, 3), new(4, 5, 6));
         var pairPointToString = pairMapper(pairPointFrom);
 
@@ -101,9 +91,7 @@ public class ILMapperGeneratorDerivedTypesTests
     [Test]
     public void mapping_ObjHolder_to_StrHolder()
     {
-        var dummyMapper = new DummyMapper();
-
-        var objMapper = dummyMapper.GetMapper<ObjHolder, StrHolder>();
+        var objMapper = Mapper.GetMapper<ObjHolder, StrHolder>();
         var objHolder = new ObjHolder(new PointFrom(1, 2, 3), new PointToString("A", "B"));
         var strHolder = objMapper(objHolder);
 
@@ -117,9 +105,7 @@ public class ILMapperGeneratorDerivedTypesTests
     [Test]
     public void mapping_StrHolder_to_StrHolder()
     {
-        var dummyMapper = new DummyMapper();
-
-        var strMapper = dummyMapper.GetMapper<StrHolder, StrHolder>();
+        var strMapper = Mapper.GetMapper<StrHolder, StrHolder>();
         var strHolder1 = new StrHolder("foobar", "moocow");
         var strHolder2 = strMapper(strHolder1);
 

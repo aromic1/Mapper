@@ -21,49 +21,43 @@ namespace Aronic.Mapper
         }
     }
 
+    class CantMapError : Exception { }
+
     public class ILMapper : ILMapperMixin
     {
         public override (PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo) GetMappingInfo(Type fromType, Type toType)
         {
-            var fromTypeProperties = fromType.GetProperties();
-            var toTypeConstructorsThatCanBeUsed = toType.GetConstructors().Where(x => x.GetParameters().Length <= fromTypeProperties.Length).OrderByDescending(x => x.GetParameters().Length).ToArray();
-            var fromTypePropsToReturn = new List<PropertyInfo>();
-            if (toType.IsAssignableFrom(fromType))
+            var fromPropertiesByName = fromType.GetProperties().ToDictionary(property => property.Name, property => property);
+            bool canMap(Type fromType, Type toType) => fromType == toType || CanFastConvert(fromType, toType) || (FastTypeInfo.IsRecordType(toType) && FastTypeInfo.IsRecordType(fromType));
+
+            foreach (var constructor in toType.GetConstructors())
             {
-                var constructorToUse = toTypeConstructorsThatCanBeUsed.First();
-                var toTypeParams = constructorToUse.GetParameters();
-                foreach (var toTypeParam in toTypeParams)
+                try
                 {
-                    fromTypePropsToReturn.Add(fromTypeProperties.Single(x => x.Name == toTypeParam.Name));
+                    return (
+                        fromProperties: constructor
+                            .GetParameters()
+                            .Select(toParameter =>
+                            {
+                                if (fromPropertiesByName.TryGetValue(toParameter.Name!, out var fromProperty) && canMap(fromProperty.PropertyType, toParameter.ParameterType))
+                                    return fromProperty;
+                                else
+                                    throw new CantMapError();
+                            })
+                            .ToArray(),
+                        toConstructorInfo: constructor
+                    );
                 }
-                return (fromTypePropsToReturn.ToArray(), constructorToUse);
+                catch (CantMapError)
+                {
+                    // pass
+                }
+                catch (KeyNotFoundException)
+                {
+                    // pass
+                }
             }
-            foreach (var toTypeConstructor in toTypeConstructorsThatCanBeUsed)
-            {
-                var toTypeParameters = toTypeConstructor.GetParameters();
-                bool canUse = true;
-                var i = 0;
-                do
-                {
-                    var fromProperty = fromTypeProperties[i];
-                    var toParameter = toTypeParameters[i];
-                    var fromPropertyType = fromProperty.GetType();
-                    var toParameterType = toParameter.GetType();
-                    if (fromProperty.Name == toParameter.Name && (fromPropertyType == toParameterType || CanFastConvert(fromPropertyType, toParameterType) || (FastTypeInfo.IsRecordType(toParameterType) && FastTypeInfo.IsRecordType(fromPropertyType))))
-                    {
-                        i++;
-                        fromTypePropsToReturn.Add(fromProperty);
-                        continue;
-                    }
-                    canUse = false;
-                }
-                while (canUse && i < toTypeParameters.Length);
-                if (canUse)
-                {
-                    return (fromTypePropsToReturn.ToArray(), toTypeConstructor);
-                }
-                fromTypePropsToReturn.Clear();
-            }
+
             throw new Exception($"Cannot map from {fromType} to {toType}. There is no {toType} constructor that can be used to initialize instance of the returning type object");
         }
     }

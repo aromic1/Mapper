@@ -1,3 +1,19 @@
+# Running tests:
+
+## Functionality tests:
+
+```bash
+dotnet test
+```
+
+## Performance tests:
+
+```bash
+code PerformanceTests
+# in the new window
+dotnet run -c release
+```
+
 # TODO:
 * you need to bring in the old stuff that's still relevant
     - no configuration stuff

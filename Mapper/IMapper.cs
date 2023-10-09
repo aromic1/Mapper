@@ -20,4 +20,14 @@ public interface IMapper
     public object GetMapper(Type fromType, Type toType);
 
     public Func<From, To> GetMapper<From, To>() => (Func<From, To>)GetMapper(typeof(From), typeof(To));
+
+    public class MapperException : Exception
+    {
+        public MapperException()
+        { }
+
+        public MapperException(string message) : base(message)
+        {
+        }
+    }
 }

@@ -4,7 +4,7 @@ using Aronic.Mapper.Tests.PointRecords;
 
 namespace Aronic.Mapper.Tests.DummyMapper;
 
-public class DummyMapper : ILMapperMixin
+public class DummyMapper : BaseILMapper
 {
     public DummyMapper() { }
 

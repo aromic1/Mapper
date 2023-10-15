@@ -6,45 +6,13 @@ namespace Aronic.Mapper;
 /// <summary>
 /// Generates methods in IL using Reflection.Emit
 /// </summary>
-public abstract class ILMapperMixin : IMapper
+public abstract class BaseILMapper : BaseMapper
 {
     public abstract (PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo) GetMappingInfo(Type fromType, Type toType);
 
-    public object? Map(object? from, Type fromType, Type toType)
-    {
-        if (from == null)
-            return null;
-        var mapper = GetMapper(fromType, toType);
-        // proof that Invoke exists:
-        // https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/delegates#203-delegate-members
-        var invoke = mapper.GetType().GetMethod("Invoke", new[] { fromType })!;
-        return invoke.Invoke(mapper, new object[] { from });
-    }
+    public override object BuildMapper(Type fromType, Type toType) => BuildMapperInternal(fromType, toType);
 
-    public Func<From, To> GetMapper<From, To>() =>
-        CanFastConvert(typeof(From), typeof(To)) ? (Func<From, To>)GetFastConvertMapper(typeof(From), typeof(To)) : (Func<From, To>)GetMapper(typeof(From), typeof(To));
-
-    public virtual object GetMapper(Type fromType, Type toType) => CanFastConvert(fromType, toType) ? GetFastConvertMapper(fromType, toType) : GetMapperInternal(fromType, toType);
-
-    public static object GetFastConvertMapper(Type fromType, Type toType)
-    {
-        if (!CanFastConvert(fromType, toType))
-            throw new ArgumentException($"expected two primitive types");
-        var delegateType = typeof(Func<,>).MakeGenericType(fromType, toType);
-        var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{toType.Name},{fromType.Name}>", toType, new[] { fromType });
-        var ilGenerator = dynamicMapper.GetILGenerator();
-        // In this case we know we are going to call ToString(),
-        // and we need the address of arg_i, not just the value
-        if (fromType.IsValueType && toType == typeof(String))
-            ilGenerator.Emit(OpCodes.Ldarga, 0);
-        else
-            ilGenerator.Emit(OpCodes.Ldarg_0);
-        FastConvert(ilGenerator, fromType, toType);
-        ilGenerator.Emit(OpCodes.Ret);
-        return dynamicMapper.CreateDelegate(delegateType);
-    }
-
-    private object GetMapperInternal(Type fromType, Type toType)
+    private object BuildMapperInternal(Type fromType, Type toType)
     {
         if (CanFastConvert(fromType, toType))
             return GetFastConvertMapper(fromType, toType);
@@ -57,7 +25,7 @@ public abstract class ILMapperMixin : IMapper
         if (toParameters.Length != fromProperties.Length)
             throw new ArgumentException($"toParameters length {toParameters.Length} does not match fromProperties length {fromProperties.Length}");
 
-        var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{fromType.Name},{toType.Name}>", toType, new[] { typeof(IMapper), fromType }, typeof(ILMapperMixin));
+        var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{fromType.Name},{toType.Name}>", toType, new[] { typeof(IMapper), fromType }, typeof(BaseILMapper));
 
         var ilGenerator = dynamicMapper.GetILGenerator();
 
@@ -115,6 +83,8 @@ public abstract class ILMapperMixin : IMapper
         return dynamicMapper.CreateDelegate(typeof(Func<,>).MakeGenericType(fromType, toType), this);
     }
 
+    # region FastConvert
+
     public static readonly Type[] NumericTypes = new[] { typeof(Int16), typeof(Int32), typeof(Int64), typeof(UInt16), typeof(UInt32), typeof(UInt64), typeof(Double) };
 
     public static bool CanFastConvert(Type fromType, Type toType) =>
@@ -140,6 +110,24 @@ public abstract class ILMapperMixin : IMapper
             foreach (var opCode in fastConvertOpCodes)
                 ilGenerator.Emit(opCode);
         }
+    }
+
+    public static object GetFastConvertMapper(Type fromType, Type toType)
+    {
+        if (!CanFastConvert(fromType, toType))
+            throw new ArgumentException($"expected two primitive types");
+        var delegateType = typeof(Func<,>).MakeGenericType(fromType, toType);
+        var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{toType.Name},{fromType.Name}>", toType, new[] { fromType });
+        var ilGenerator = dynamicMapper.GetILGenerator();
+        // In this case we know we are going to call ToString(),
+        // and we need the address of arg_i, not just the value
+        if (fromType.IsValueType && toType == typeof(String))
+            ilGenerator.Emit(OpCodes.Ldarga, 0);
+        else
+            ilGenerator.Emit(OpCodes.Ldarg_0);
+        FastConvert(ilGenerator, fromType, toType);
+        ilGenerator.Emit(OpCodes.Ret);
+        return dynamicMapper.CreateDelegate(delegateType);
     }
 
     public record FastConvertSignature(Type From, Type To);
@@ -186,4 +174,5 @@ public abstract class ILMapperMixin : IMapper
             { new(typeof(UInt64),   typeof(UInt16)),    new[] { OpCodes.Conv_U8 } },
             { new(typeof(UInt64),   typeof(UInt32)),    new[] { OpCodes.Conv_U8 } },
         };
+    # endregion
 }

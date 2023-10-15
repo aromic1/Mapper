@@ -36,7 +36,7 @@ namespace Aronic.Mapper
         }
     }
 
-    public class ILMapper : ILMapperMixin
+    public class ILMapper : BaseILMapper
     {
         public static Dictionary<(Type, Type), (PropertyInfo[], ConstructorInfo)> MappingInfoCache = new Dictionary<(Type, Type), (PropertyInfo[], ConstructorInfo)>();
 
@@ -104,11 +104,11 @@ namespace Aronic.Mapper
         }
     }
 
-    public class ReflectionOnlyMapper : IMapper
+    public class ReflectionOnlyMapper : BaseMapper
     {
         private Dictionary<Type, Type> TypesFromInterfaces = new Dictionary<Type, Type>();
 
-        public object GetMapper(Type fromType, Type toType)
+        public override object BuildMapper(Type fromType, Type toType)
         {
             var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{fromType.Name},{toType.Name}>", toType, new[] { typeof(IMapper), fromType }, typeof(ReflectionOnlyMapper));
             return dynamicMapper.CreateDelegate(typeof(Func<,>).MakeGenericType(fromType, toType), this);
@@ -463,5 +463,7 @@ namespace Aronic.Mapper
 
             return setterBuilder;
         }
+
+
     }
 }

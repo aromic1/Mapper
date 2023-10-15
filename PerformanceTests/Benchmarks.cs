@@ -1,11 +1,16 @@
 ﻿using System;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Engines;
 using BenchmarkDotNet.Running;
 using AutoMapper;
+using Aronic.Mapper;
 using Aronic.Mapper.Tests;
+using Aronic.Mapper.Tests.DummyMapper;
+using Aronic.Mapper.Tests.PointRecords;
 
 namespace MyBenchmarks
 {
+    // [SimpleJob(RunStrategy.ColdStart, launchCount: 3, warmupCount: 1, iterationCount: 5)]
     public class DummyBenchmarks
     {
         private const int N = 10000;
@@ -13,6 +18,8 @@ namespace MyBenchmarks
         private readonly PairPointTo[] pairPointTos;
 
         private readonly MapperConfiguration mapperConfiguration;
+        private readonly ILMapper ilMapper;
+        private readonly DummyMapper dummyMapper;
 
         public DummyBenchmarks()
         {
@@ -27,6 +34,8 @@ namespace MyBenchmarks
                 cfg.CreateMap<PointFrom, PointTo>();
                 cfg.CreateMap<PairPointFrom, PairPointTo>();
             });
+            ilMapper = new ILMapper();
+            dummyMapper = new DummyMapper();
         }
 
         [Benchmark]
@@ -48,10 +57,17 @@ namespace MyBenchmarks
         // }
 
         [Benchmark]
-        public void DummyMapperWithCacheToShort()
+        public void DummyMapperToShort()
         {
-            var dummyMapperWithCache = new DummyMapperWithCache();
-            var pairMapper = dummyMapperWithCache.GetMapper<PairPointFrom, PairPointTo>();
+            var pairMapper = dummyMapper.GetMapper<PairPointFrom, PairPointTo>();
+            for (int i = 0; i < pairPointFroms.Length; ++i)
+                pairPointTos[i] = pairMapper(pairPointFroms[i]);
+        }
+
+        [Benchmark]
+        public void ILMapperWithCacheToShort()
+        {
+            var pairMapper = ilMapper.GetMapper<PairPointFrom, PairPointTo>();
             for (int i = 0; i < pairPointFroms.Length; ++i)
                 pairPointTos[i] = pairMapper(pairPointFroms[i]);
         }

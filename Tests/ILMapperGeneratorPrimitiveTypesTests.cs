@@ -9,7 +9,7 @@ public class ILMapperGeneratorPrimitiveTypesTests
     [SetUp]
     public void Setup() { }
 
-    public class ILMapper : ILMapperMixin
+    public class ILMapper : BaseILMapper
     {
         public override (PropertyInfo[] fromProperties, ConstructorInfo toConstructorInfo) GetMappingInfo(Type fromType, Type toType)
         {

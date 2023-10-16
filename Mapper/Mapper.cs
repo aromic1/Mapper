@@ -2,6 +2,7 @@ using System.Collections;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
+using static Aronic.Mapper.ILMapperMixin;
 using static Aronic.Mapper.IMapper;
 
 namespace Aronic.Mapper
@@ -134,15 +135,16 @@ namespace Aronic.Mapper
                 else
                 {
                     IEnumerable sourceEnumerable = (IEnumerable)source;
+                    var underlyingDestinationType = tDestination.IsArray ? tDestination.GetElementType() : tDestination.GetGenericArguments()[0];
                     if (source == null)
                     {
-                        return Array.CreateInstance(tDestination.GetElementType(), 0);
+                        return Array.CreateInstance(underlyingDestinationType, 0);
                     }
-                    IList destinationList = new List<object>();
+                    Type listType = typeof(List<>).MakeGenericType(underlyingDestinationType);
+                    IList destinationList = (IList)Activator.CreateInstance(listType);
                     int i = 0;
                     foreach (var sourceItem in sourceEnumerable)
                     {
-                        var underlyingDestinationType = tDestination.IsArray ? tDestination.GetElementType() : tDestination.GetGenericArguments()[0];
                         var underlyingSourceType = sourceType.IsArray ? sourceType.GetElementType() : sourceType.GetGenericArguments()[0];
                         var sourceItemType = sourceItem.GetType();
                         var mappedDestinationItem = MapCore(sourceItem, underlyingSourceType, underlyingDestinationType, alreadyMappedObjects);
@@ -153,12 +155,9 @@ namespace Aronic.Mapper
                 }
             }
 
-            if (alreadyMappedObjects != null)
+            if (alreadyMappedObjects.TryGetValue(source, out var destinationValue))
             {
-                if (alreadyMappedObjects.TryGetValue(source, out var destinationValue))
-                {
-                    return destinationValue;
-                }
+                return destinationValue;
             }
             if (FastTypeInfo.IsRecordType(tDestination))
             {
@@ -166,7 +165,7 @@ namespace Aronic.Mapper
             }
             else if (tDestination.IsInterface)
             {
-                var destinationType = CreateClassTypeFromInterface(sourceType);
+                var destinationType = CreateClassTypeFromInterface(tDestination);
                 destination = Activator.CreateInstance(destinationType);
             }
             else
@@ -184,11 +183,14 @@ namespace Aronic.Mapper
             }
 
             //get destination properties that are not ignored within configuration and map the values from source properties with the same name
-            //filter out the ones that are set to be ignored if there are any
+            //filter out the ones that are set to be ignored if there are any 
+            if (!alreadyMappedObjects.ContainsKey(source))
+            {
+                alreadyMappedObjects.Add(source, destination);
+            }
             var properties = tDestination.GetProperties()
                 .Where(x => x.CanWrite)
-                .Select(prop => { PropertyMap(source, destination, prop, alreadyMappedObjects); return prop; }).ToArray();
-            alreadyMappedObjects!.Add(source, destination);
+            .Select(prop => { PropertyMap(source, destination, prop, alreadyMappedObjects); return prop; }).ToArray();
             return destination;
         }
 
@@ -230,17 +232,23 @@ namespace Aronic.Mapper
                 {
                     property.SetValue(destination, sourceValue);
                 }
-                else
+                else 
                 {
-                    Convert.ChangeType(sourceValue, propertyType);
+                    if(ConvOpCodes.ContainsKey(new(sourcePropertyType, propertyType))){
+                        property.SetValue(destination, Convert.ChangeType(sourceValue, propertyType));
+                    }
+                    else
+                    {
+                        property.SetValue(destination, sourceValue);
+                    }
                 }
             }
             else if (!propertyType.IsPrimitive)
             {
-                mappedDestination = MapCore(sourceValue, propertyType, sourcePropertyType, alreadyMappedObjects);
+                mappedDestination = MapCore(sourceValue, sourcePropertyType, propertyType, alreadyMappedObjects);
                 property.SetValue(destination, mappedDestination);
             }
-            else
+            else 
             {
                 property.SetValue(destination, sourceValue);
             }
@@ -307,7 +315,7 @@ namespace Aronic.Mapper
             if (sourcePropertyType != destinationPropertyType)
             {
                 //if (destinationPropertyType.GetMethods().Any(x => x.Name == "<Clone>$"))
-                if (FastTypeInfo.IsRecordType(destinationPropertyType))
+                if (FastTypeInfo.IsRecordType(destinationPropertyType) || destinationPropertyType == typeof(string) || (NumericTypes.Contains(sourcePropertyType) && NumericTypes.Contains(destinationPropertyType)))
                 {
                     return;
                 }
@@ -397,9 +405,10 @@ namespace Aronic.Mapper
                 TypesFromInterfaces.Add(interfaceType, newType);
                 return newType;
             }
-            catch
+            catch(Exception ex) 
             {
-                throw new MapperException($"Make sure your interface {interfaceType.Name} is public.");
+                throw; 
+                //throw new MapperException($"Make sure your interface {interfaceType.Name} is public.");
             }
         }
 

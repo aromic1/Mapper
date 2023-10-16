@@ -1,32 +1,30 @@
 ﻿using NUnit.Framework;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Aronic.Mapper.Tests.PrivatePropMapTest
 {
     public class PrivatePropMapTest
     {
-        private IMapper Mapper = new ILMapper(); 
+        private IMapper Mapper = new ILMapper();
+
         public class FromTest
         {
-            public FromTest( string name)
+            public FromTest(string name)
             {
                 Name = name;
             }
+
             public string Name { private get; set; }
         }
+
         public class ToTest
         {
-            public ToTest(string Name) 
+            public ToTest(string Name)
             {
                 NameProp = Name;
             }
+
             public string NameProp { get; set; }
         }
-
 
         [Test]
         public void PrivatePropMapTestMethod()

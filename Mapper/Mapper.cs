@@ -222,7 +222,7 @@ namespace Aronic.Mapper
             {
                 return;
             }
-            else if (sourceProperty == typeof(string))
+            else if (sourceProperty.PropertyType == typeof(string))
             {
                 property.SetValue(destination, sourceValue.ToString());
             }

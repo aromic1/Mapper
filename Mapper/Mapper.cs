@@ -154,14 +154,15 @@ namespace Aronic.Mapper
                     return destinationList;
                 }
             }
-
+            var ctorParamsToExclude = new List<ParameterInfo>();
             if (alreadyMappedObjects.TryGetValue(source, out var destinationValue))
             {
                 return destinationValue;
             }
             if (FastTypeInfo.IsRecordType(tDestination))
             {
-                destination = CreateInstanceOfRecordType(source, tDestination);
+                (destination, var constructorThatWasUsed) = CreateInstanceOfRecordType(source, tDestination, alreadyMappedObjects);
+                ctorParamsToExclude.AddRange(constructorThatWasUsed.GetParameters());
             }
             else if (tDestination.IsInterface)
             {
@@ -183,14 +184,14 @@ namespace Aronic.Mapper
             }
 
             //get destination properties that are not ignored within configuration and map the values from source properties with the same name
-            //filter out the ones that are set to be ignored if there are any 
+            //filter out the ones that are set to be ignored if there are any
             if (!alreadyMappedObjects.ContainsKey(source))
             {
                 alreadyMappedObjects.Add(source, destination);
             }
             var properties = tDestination.GetProperties()
-                .Where(x => x.CanWrite)
-            .Select(prop => { PropertyMap(source, destination, prop, alreadyMappedObjects); return prop; }).ToArray();
+                .Where(prop => prop.CanWrite && !ctorParamsToExclude.Any(param => param.Name == prop.Name))
+                .Select(prop => { PropertyMap(source, destination, prop, alreadyMappedObjects); return prop; }).ToArray();
             return destination;
         }
 
@@ -222,7 +223,7 @@ namespace Aronic.Mapper
             {
                 return;
             }
-            else if (sourceProperty.PropertyType == typeof(string))
+            else if (property.PropertyType == typeof(string))
             {
                 property.SetValue(destination, sourceValue.ToString());
             }
@@ -232,9 +233,10 @@ namespace Aronic.Mapper
                 {
                     property.SetValue(destination, sourceValue);
                 }
-                else 
+                else
                 {
-                    if(ConvOpCodes.ContainsKey(new(sourcePropertyType, propertyType))){
+                    if (ConvOpCodes.ContainsKey(new(sourcePropertyType, propertyType)))
+                    {
                         property.SetValue(destination, Convert.ChangeType(sourceValue, propertyType));
                     }
                     else
@@ -248,7 +250,7 @@ namespace Aronic.Mapper
                 mappedDestination = MapCore(sourceValue, sourcePropertyType, propertyType, alreadyMappedObjects);
                 property.SetValue(destination, mappedDestination);
             }
-            else 
+            else
             {
                 property.SetValue(destination, sourceValue);
             }
@@ -256,16 +258,16 @@ namespace Aronic.Mapper
 
         public static readonly Type[] NumericTypes = new[] { typeof(Int16), typeof(Int32), typeof(Int64), typeof(UInt16), typeof(UInt32), typeof(UInt64), typeof(Double) };
 
-        private object CreateInstanceOfRecordType<TSource>(TSource source, Type destinationType)
+        private (object, ConstructorInfo) CreateInstanceOfRecordType<TSource>(TSource source, Type destinationType, Dictionary<object, object> alreadyMappedObjects)
         {
             var constructors = destinationType.GetConstructors().ToList();
             if (constructors.Count > 0)
             {
                 constructors = constructors.OrderBy(constructor => constructor.GetParameters().Length).ToList();
-                var (constructorWithTheLeastParametersThatCanBeUsed, propertiesToUse) = FindConstructorWithTheLeastParameters(source, constructors);
+                var (constructorWithTheLeastParametersThatCanBeUsed, propertiesToUse) = FindConstructorWithTheLeastParameters(source, constructors, alreadyMappedObjects);
                 if (constructorWithTheLeastParametersThatCanBeUsed != null)
                 {
-                    return constructorWithTheLeastParametersThatCanBeUsed.Invoke(propertiesToUse.Select(x => x.GetValue(source)).ToArray());
+                    return (constructorWithTheLeastParametersThatCanBeUsed.Invoke(propertiesToUse.ToArray()), constructorWithTheLeastParametersThatCanBeUsed);
                 }
                 else
                 {
@@ -275,10 +277,10 @@ namespace Aronic.Mapper
             throw new MapperException($"No constructors defined for {destinationType.Name}");
         }
 
-        private (ConstructorInfo, List<PropertyInfo>) FindConstructorWithTheLeastParameters<TSource>(TSource source, List<ConstructorInfo> constructors)
+        private (ConstructorInfo, List<object>) FindConstructorWithTheLeastParameters<TSource>(TSource source, List<ConstructorInfo> constructors, Dictionary<object, object> alreadyMappedObjects)
         {
             ConstructorInfo constructorWithLeastParameters = constructors.First();
-            var propertiesToUse = new List<PropertyInfo>();
+            var propertiesToUse = new List<object>();
             if (constructorWithLeastParameters.GetParameters().Length == 0)
             {
                 return (constructorWithLeastParameters, propertiesToUse);
@@ -289,7 +291,30 @@ namespace Aronic.Mapper
             {
                 if (sourceProperties.Select(x => x.Name).ToArray().Contains(parameter.Name))
                 {
-                    propertiesToUse.Add(sourceProperties.First(x => x.Name == parameter.Name));
+                    var sourceProperty = sourceProperties.First(x => x.Name == parameter.Name);
+                    if (sourceProperty.PropertyType == parameter.ParameterType)
+                    {
+                        propertiesToUse.Add(sourceProperty.GetValue(source));
+                    }
+                    else if (parameter.ParameterType == typeof(string))
+                    {
+                        propertiesToUse.Add(sourceProperty.GetValue(source).ToString());
+                    }
+                    else if (NumericTypes.Contains(sourceProperty.PropertyType) && NumericTypes.Contains(parameter.ParameterType))
+                    {
+                        if (ConvOpCodes.ContainsKey(new(sourceProperty.PropertyType, parameter.ParameterType)))
+                        {
+                            propertiesToUse.Add(Convert.ChangeType(sourceProperty.GetValue(source), parameter.ParameterType));
+                        }
+                        else
+                        {
+                            propertiesToUse.Add(sourceProperty.GetValue(source));
+                        }
+                    }
+                    else if (!sourceProperty.PropertyType.IsPrimitive)
+                    {
+                        propertiesToUse.Add(MapCore(sourceProperty.GetValue(source), sourceProperty.PropertyType, parameter.ParameterType, alreadyMappedObjects));
+                    }
                 }
             }
             if (ctorParameters.Count() == propertiesToUse.Count())
@@ -301,7 +326,7 @@ namespace Aronic.Mapper
                 constructors.Remove(constructorWithLeastParameters);
                 if (constructors.Any())
                 {
-                    return FindConstructorWithTheLeastParameters(source, constructors);
+                    return FindConstructorWithTheLeastParameters(source, constructors, alreadyMappedObjects);
                 }
                 else
                 {
@@ -405,9 +430,9 @@ namespace Aronic.Mapper
                 TypesFromInterfaces.Add(interfaceType, newType);
                 return newType;
             }
-            catch(Exception ex) 
+            catch (Exception ex)
             {
-                throw; 
+                throw;
                 //throw new MapperException($"Make sure your interface {interfaceType.Name} is public.");
             }
         }

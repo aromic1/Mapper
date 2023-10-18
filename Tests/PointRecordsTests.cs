@@ -77,9 +77,8 @@ public abstract class PointRecordsTests
     [Test]
     public void mapping_PairPointFrom_to_PairPointToString()
     {
-        var pairMapper = Mapper.GetMapper<PairPointFrom, PairPointToString>();
         var pairPointFrom = new PairPointFrom(new(1, 2, 3), new(4, 5, 6));
-        var pairPointToString = pairMapper(pairPointFrom);
+        var pairPointToString = (PairPointToString)Mapper.Map(pairPointFrom, typeof(PairPointFrom), typeof(PairPointToString));
 
         Assert.That(pairPointToString, Is.TypeOf(typeof(PairPointToString)));
         Assert.That(pairPointToString.L.X, Is.EqualTo(pairPointFrom.L.X.ToString()));

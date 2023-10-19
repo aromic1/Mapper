@@ -44,3 +44,14 @@ Fixed whatever was busted
 | ILMapperWithCacheToShort | 3,072.1 us | 55.56 us |  61.76 us |
 | LambdMapToShort          |   167.5 us |  3.00 us |   4.31 us |
 ```
+
+`[2023-10-19T17_32_53]`
+```
+| Method                      | Mean        | Error       | StdDev     | Median      |
+|---------------------------- |------------:|------------:|-----------:|------------:|
+| AutoMapToShort              |  7,184.4 us | 10,679.8 us | 9,989.9 us |  2,355.4 us |
+| DummyMapperToShort          |  8,119.5 us |  6,548.5 us | 6,125.5 us |  5,144.1 us |
+| ReflectionOnlyMapperToShort | 39,249.6 us |  4,731.6 us | 4,425.9 us | 37,814.4 us |
+| ILMapperWithCacheToShort    |  8,989.1 us |  7,912.9 us | 7,401.7 us |  5,415.4 us |
+| LambdMapToShort             |    705.0 us |    485.6 us |   454.2 us |    451.8 us |
+```

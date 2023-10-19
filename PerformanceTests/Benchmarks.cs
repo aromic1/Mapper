@@ -10,7 +10,7 @@ using Aronic.Mapper.Tests.PointRecords;
 
 namespace MyBenchmarks
 {
-    // [SimpleJob(RunStrategy.ColdStart, launchCount: 3, warmupCount: 1, iterationCount: 5)]
+    [SimpleJob(RunStrategy.ColdStart, launchCount: 3, warmupCount: 1, iterationCount: 5)]
     public class DummyBenchmarks
     {
         private const int N = 10000;
@@ -20,6 +20,7 @@ namespace MyBenchmarks
         private readonly MapperConfiguration mapperConfiguration;
         private readonly ILMapper ilMapper;
         private readonly DummyMapper dummyMapper;
+        private readonly ReflectionOnlyMapper reflectionOnlyMapper;
 
         public DummyBenchmarks()
         {
@@ -36,6 +37,7 @@ namespace MyBenchmarks
             });
             ilMapper = new ILMapper();
             dummyMapper = new DummyMapper();
+            reflectionOnlyMapper = new ReflectionOnlyMapper();
         }
 
         [Benchmark]
@@ -62,6 +64,14 @@ namespace MyBenchmarks
             var pairMapper = dummyMapper.GetMapper<PairPointFrom, PairPointTo>();
             for (int i = 0; i < pairPointFroms.Length; ++i)
                 pairPointTos[i] = pairMapper(pairPointFroms[i]);
+        }
+
+        [Benchmark]
+        public void ReflectionOnlyMapperToShort()
+        {
+            // var pairMapper = reflectionOnlyMapper.GetMapper<PairPointFrom, PairPointTo>();
+            for (int i = 0; i < pairPointFroms.Length; ++i)
+                pairPointFroms[i] = (PairPointFrom)reflectionOnlyMapper.Map(pairPointFroms[i], typeof(PairPointFrom), typeof(PairPointFrom));
         }
 
         [Benchmark]

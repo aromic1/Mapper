@@ -10,7 +10,7 @@ using Aronic.Mapper.Tests.PointRecords;
 
 namespace MyBenchmarks
 {
-    [SimpleJob(RunStrategy.ColdStart, launchCount: 3, warmupCount: 1, iterationCount: 5)]
+    // [SimpleJob(RunStrategy.ColdStart, launchCount: 3, warmupCount: 1, iterationCount: 5)]
     public class DummyBenchmarks
     {
         private const int N = 10000;

@@ -46,7 +46,9 @@ Fixed whatever was busted
 ```
 
 `[2023-10-19T17_32_53]`
+NOTE: the error is too high to be useful here, it's like 100%.
 ```
+[SimpleJob(RunStrategy.ColdStart, launchCount: 3, warmupCount: 1, iterationCount: 5)]
 | Method                      | Mean        | Error       | StdDev     | Median      |
 |---------------------------- |------------:|------------:|-----------:|------------:|
 | AutoMapToShort              |  7,184.4 us | 10,679.8 us | 9,989.9 us |  2,355.4 us |
@@ -54,4 +56,16 @@ Fixed whatever was busted
 | ReflectionOnlyMapperToShort | 39,249.6 us |  4,731.6 us | 4,425.9 us | 37,814.4 us |
 | ILMapperWithCacheToShort    |  8,989.1 us |  7,912.9 us | 7,401.7 us |  5,415.4 us |
 | LambdMapToShort             |    705.0 us |    485.6 us |   454.2 us |    451.8 us |
+```
+
+`[2023-10-19T17_39_17]`
+```
+// Default job settings
+| Method                      | Mean        | Error    | StdDev   |
+|---------------------------- |------------:|---------:|---------:|
+| AutoMapToShort              |  1,209.6 us |  5.41 us |  5.06 us |
+| DummyMapperToShort          |  5,661.7 us | 22.74 us | 21.27 us |
+| ReflectionOnlyMapperToShort | 17,125.1 us | 87.41 us | 81.77 us |
+| ILMapperWithCacheToShort    |  5,621.9 us | 16.38 us | 15.32 us |
+| LambdMapToShort             |    274.0 us |  1.61 us |  1.43 us |
 ```

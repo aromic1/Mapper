@@ -2,7 +2,7 @@ using System.Collections;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
-using static Aronic.Mapper.ILMapperMixin;
+using static Aronic.Mapper.BaseILMapper;
 using static Aronic.Mapper.IMapper;
 
 namespace Aronic.Mapper
@@ -110,8 +110,9 @@ namespace Aronic.Mapper
 
         public override object BuildMapper(Type fromType, Type toType)
         {
-            var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{fromType.Name},{toType.Name}>", toType, new[] { typeof(IMapper), fromType }, typeof(ReflectionOnlyMapper));
-            return dynamicMapper.CreateDelegate(typeof(Func<,>).MakeGenericType(fromType, toType), this);
+            // var dynamicMapper = new DynamicMethod($"DynamicMapper`2<{fromType.Name},{toType.Name}>", toType, new[] { typeof(IMapper), fromType }, typeof(ReflectionOnlyMapper));
+            // return dynamicMapper.CreateDelegate(typeof(Func<,>).MakeGenericType(fromType, toType), this);
+            return (object from) => Map(from, fromType, toType);
         }
 
         public object? Map(object? from, Type fromType, Type toType)
